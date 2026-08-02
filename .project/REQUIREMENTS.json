@@ -1,0 +1,104 @@
+{
+  "schema_version": "aevum.requirements/v1",
+  "generated_at": "2026-08-02T00:00:00+02:00",
+  "authority": "Winter Fernandes",
+  "source": "AEVUM_UNIFY_MASTER_BLUEPRINT_V1.0.md",
+  "milestone": "M0",
+  "requirements": [
+    {
+      "id": "AU-M0-001",
+      "title": "STATE_OF_TRUTH à jour et versionné",
+      "category": "governance",
+      "blueprint_refs": ["§29.2"],
+      "status": "implemented",
+      "evidence": [".project/STATE_OF_TRUTH.md", ".project/DECISIONS.md"]
+    },
+    {
+      "id": "AU-M0-002",
+      "title": "12 ADR initiaux publiés",
+      "category": "architecture",
+      "blueprint_refs": ["§8", "§27.3", "AU-M00-L01"],
+      "status": "implemented",
+      "evidence": ["docs/adr/ADR-0001-new-monorepo.md", "docs/adr/ADR-0012-content-addressed-evidence.md"]
+    },
+    {
+      "id": "AU-M0-003",
+      "title": "Risk register initial",
+      "category": "security",
+      "blueprint_refs": ["§21", "§29.2"],
+      "status": "implemented",
+      "evidence": [".project/RISK_REGISTER.md"]
+    },
+    {
+      "id": "AU-M0-004",
+      "title": "Matrice de traçabilité requirements↔composants↔tests↔evidence",
+      "category": "governance",
+      "blueprint_refs": ["§29.2", "Annexe E"],
+      "status": "implemented",
+      "evidence": [".project/TRACEABILITY.md"]
+    },
+    {
+      "id": "AU-M0-005",
+      "title": "Inventaire Sentinel (adopt/rewrite/reject/defer)",
+      "category": "migration",
+      "blueprint_refs": ["§2.3", "AU-M00-L05"],
+      "status": "implemented",
+      "evidence": ["docs/migration/SENTINEL_INVENTORY.md"]
+    },
+    {
+      "id": "AU-M0-006",
+      "title": "Rejet explicite du chemin `sh -c` agentique",
+      "category": "security",
+      "blueprint_refs": ["§2.1", "§16.4"],
+      "status": "implemented",
+      "evidence": ["docs/adr/ADR-0006-no-raw-shell.md", ".project/RISK_REGISTER.md"]
+    },
+    {
+      "id": "AU-M0-007",
+      "title": "Skeleton crates Kernel (Rust, no provider)",
+      "category": "implementation",
+      "blueprint_refs": ["§26", "AU-M00-L03"],
+      "status": "implemented",
+      "evidence": [
+        "crates/sentinel-kernel/src/lib.rs",
+        "crates/identity/src/lib.rs",
+        "crates/capability-engine/src/lib.rs",
+        "crates/secret-broker/src/lib.rs",
+        "crates/ledger/src/lib.rs",
+        "crates/attestation/src/lib.rs"
+      ]
+    },
+    {
+      "id": "AU-M0-008",
+      "title": "Mission Control skeleton (React strict)",
+      "category": "implementation",
+      "blueprint_refs": ["§9.2", "AU-M00-L04"],
+      "status": "implemented",
+      "evidence": ["apps/mission-control/src/App.tsx"]
+    },
+    {
+      "id": "AU-M0-009",
+      "title": "CI minimale clean build + tests",
+      "category": "quality",
+      "blueprint_refs": ["§31", "AU-M00-L04"],
+      "status": "implemented",
+      "evidence": [".github/workflows/ci.yml"]
+    },
+    {
+      "id": "AU-M0-010",
+      "title": "Package contracts skeleton (Rust + TS)",
+      "category": "contracts",
+      "blueprint_refs": ["§26"],
+      "status": "planned",
+      "evidence": ["packages/contracts/ (planned M0+1)"]
+    },
+    {
+      "id": "AU-M0-011",
+      "title": "Evidence manifest pour loop AU-M00-L01",
+      "category": "evidence",
+      "blueprint_refs": ["§28", "Annexe D"],
+      "status": "implemented",
+      "evidence": [".project/tasks/AU-M00-L01/evidence-manifest.json"]
+    }
+  ]
+}

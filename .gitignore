@@ -1,0 +1,34 @@
+# Build & cache artefacts
+node_modules/
+**/node_modules/
+**/dist/
+**/target/
+**/.cargo/
+**/tsconfig.tsbuildinfo
+**/*.tsbuildinfo
+**/.vite/
+**/.cache/
+
+# Local only
+.env
+.env.local
+*.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs
+*.log
+.project/verification/**/cargo-*.log
+.project/verification/**/pnpm-*.log
+.project/verification/**/ledger-*.log
+.project/verification/**/claims-doc-audit.log
+.project/verification/**/final-ledger-check.log
+
+# Python
+__pycache__/
+*.pyc

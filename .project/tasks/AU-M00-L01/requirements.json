@@ -1,0 +1,11 @@
+{
+  "schema_version": "aevum.task.requirements/v1",
+  "task": "AU-M00-L01",
+  "items": [
+    { "id": "REQ-01", "text": "STATE_OF_TRUTH and DECISIONS.md aligned", "criteria": "AC-02" },
+    { "id": "REQ-02", "text": "12 ADRs adopted and source-cited", "criteria": "AC-01" },
+    { "id": "REQ-03", "text": "RISK_REGISTER records sh-c rejection", "criteria": "AC-03" },
+    { "id": "REQ-04", "text": "Sentinel inventory classifies every family", "criteria": "AC-04" },
+    { "id": "REQ-05", "text": "evidence-manifest references every artefact", "criteria": "AC-05" }
+  ]
+}

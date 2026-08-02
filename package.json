@@ -1,0 +1,26 @@
+{
+  "name": "aevum-unify",
+  "version": "0.1.0-m0",
+  "private": true,
+  "description": "Aevum Unify monorepo — Mission Control & tools",
+  "license": "MIT OR Apache-2.0",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter mission-control dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "cargo:check": "cargo check",
+    "cargo:test": "cargo test",
+    "project:check": "pnpm cargo:check && pnpm build"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.0.0",
+    "@vitest/ui": "^4.1.10",
+    "jsdom": "^30.0.1",
+    "typescript": "~5.7.0",
+    "vitest": "^2.0.0"
+  }
+}

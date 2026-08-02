@@ -1,0 +1,29 @@
+{
+  "schema_version": "aevum.task.intake/v1",
+  "id": "AU-M00-L01",
+  "objective": "Repository truth — ADR foundation, risk register, traceability, sentinel inventory.",
+  "scope_in": [
+    ".project/STATE_OF_TRUTH.md",
+    ".project/DECISIONS.md",
+    ".project/REQUIREMENTS.json",
+    ".project/TRACEABILITY.md",
+    ".project/RISK_REGISTER.md",
+    "docs/adr/*",
+    "docs/migration/SENTINEL_INVENTORY.md",
+    ".project/tasks/AU-M00-L01/"
+  ],
+  "scope_out": [
+    "Vendor legacy Sentinel source",
+    "Real runtimes (Temporal, SPIRE, OPA, GitHub)",
+    "Cargo/TS app code outside M0 skeleton"
+  ],
+  "acceptance_criteria": [
+    "AC-01 12 ADR files marked adopted",
+    "AC-02 no contradiction between STATE_OF_TRUTH, DECISIONS, REQUIREMENTS, TRACEABILITY, RISK_REGISTER",
+    "AC-03 RISK_REGISTER records Sentinel sh-c rejection",
+    "AC-04 SENTINEL_INVENTORY classifies every family",
+    "AC-05 evidence-manifest references all produced files"
+  ],
+  "risks": ["R-101", "R-103"],
+  "budgets": { "tokens": "advisory", "minutes": 15, "actions": "n/a" }
+}

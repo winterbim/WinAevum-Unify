@@ -1,0 +1,31 @@
+[package]
+name = "aevum-unify"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "aevum_unify"
+path = "src/lib.rs"
+
+[[bin]]
+name = "unify"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hex = "0.4"
+aevum-attestation = { path = "../attestation" }
+aevum-ledger = { path = "../ledger" }
+aevum-identity = { path = "../identity" }
+aevum-evidence-graph = { path = "../evidence-graph" }
+aevum-autonomy-governor = { path = "../autonomy-governor" }
+aevum-sentinel-kernel = { path = "../sentinel-kernel" }
+
+[dev-dependencies]
+tempfile = "3"

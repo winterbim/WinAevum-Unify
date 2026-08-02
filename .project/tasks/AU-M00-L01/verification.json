@@ -1,0 +1,12 @@
+{
+  "schema_version": "aevum.task.verification/v1",
+  "task": "AU-M00-L01",
+  "commands_actually_run": [
+    "ls -la /home/wina/aevum unifiy/aevum-unify",
+    "find /home/wina/aevum unifiy/aevum-unify -name '*.md' -not -path '*/node_modules/*'",
+    "cat crate manifests and ts manifests"
+  ],
+  "tests_run": [],
+  "tests_run_note": "M0 skeleton loop is documentation only; the loop's own acceptance criteria are documented in AC-01..AC-05 and verified by file existence in evidence-manifest.json. Runtime / build verification belongs to loop AU-M00-L04.",
+  "results": "pending — manual review by reviewer"
+}

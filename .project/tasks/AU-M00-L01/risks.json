@@ -1,0 +1,8 @@
+{
+  "schema_version": "aevum.task.risks/v1",
+  "task": "AU-M00-L01",
+  "items": [
+    { "id": "R-101", "desc": "No runtime implementation; only docs in this loop", "mitigation": "Limit loop to docs/skeleton; runtimes land in M1+", "status": "acknowledged" },
+    { "id": "R-103", "desc": "Sentinel prototype not vendored; only inventory decisions", "mitigation": "Inventory file is the only artefact", "status": "acknowledged" }
+  ]
+}

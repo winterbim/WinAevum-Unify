@@ -1,0 +1,9 @@
+.project/STATE_OF_TRUTH.md
+AEVUM_UNIFY_MASTER_BLUEPRINT_V1.0.md
+crates/*/src/lib.rs
+apps/mission-control/src/App.tsx
+apps/mission-control/package.json
+package.json
+Cargo.toml
+pnpm-workspace.yaml
+.github/workflows/ci.yml

@@ -1,0 +1,45 @@
+//! `unify` — Aevum Unify CLI (M10).
+//!
+//! This binary is a thin wrapper around `aevum_unify::cmd_*`. All the
+//! business logic lives in `lib.rs` so it can be integration-tested
+//! without spawning a subprocess.
+
+use std::env;
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+    let argv: Vec<String> = env::args().collect();
+    if argv.len() < 2 {
+        aevum_unify::print_help();
+        return ExitCode::from(2);
+    }
+    let cmd = &argv[1];
+    let result: Result<(), aevum_unify::CliError> = match cmd.as_str() {
+        "new" => aevum_unify::cmd_new(&argv[2..]),
+        "run" => aevum_unify::cmd_run(&argv[2..]),
+        "verify" => aevum_unify::cmd_verify(&argv[2..]),
+        "package" => aevum_unify::cmd_package(&argv[2..]),
+        "verify-package" => aevum_unify::cmd_verify_package(&argv[2..]),
+        "exec" => aevum_unify::cmd_exec(&argv[2..]),
+        "--help" | "-h" | "help" => {
+            aevum_unify::print_help();
+            return ExitCode::SUCCESS;
+        }
+        "--version" | "-V" => {
+            println!("unify v{} (aevum-unify)", env!("CARGO_PKG_VERSION"));
+            return ExitCode::SUCCESS;
+        }
+        _ => {
+            eprintln!("unknown subcommand: {cmd}");
+            aevum_unify::print_help();
+            return ExitCode::from(2);
+        }
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("unify {cmd}: {e}");
+            ExitCode::from(1)
+        }
+    }
+}

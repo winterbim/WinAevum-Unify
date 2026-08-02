@@ -1,0 +1,62 @@
+diff --git a/.project/DECISIONS.md b/.project/DECISIONS.md
+new file mode 100644
+--- /dev/null
++++ b/.project/DECISIONS.md
+@@
++(see ADR files in docs/adr/)
+diff --git a/.project/REQUIREMENTS.json b/.project/REQUIREMENTS.json
+new file mode 100644
+--- /dev/null
++++ b/.project/REQUIREMENTS.json
+@@
++(M0 requirements)
+diff --git a/.project/TRACEABILITY.md b/.project/TRACEABILITY.md
+new file mode 100644
+--- /dev/null
++++ b/.project/TRACEABILITY.md
+@@
++(M0 traceability matrix)
+diff --git a/.project/RISK_REGISTER.md b/.project/RISK_REGISTER.md
+new file mode 100644
+--- /dev/null
++++ b/.project/RISK_REGISTER.md
+@@
++(M0 risk register, R-001 rejected sh-c)
+diff --git a/docs/adr/ADR-0001-new-monorepo.md b/docs/adr/ADR-0001-new-monorepo.md
+new file mode 100644
+--- /dev/null
++++ b/docs/adr/ADR-0001-new-monorepo.md
+@@
++(binding monorepo decision)
+diff --git a/docs/adr/ADR-0002-rust-kernel-typed-ui.md b/docs/adr/ADR-0002-rust-kernel-typed-ui.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0003-postgres-canonical-sqlite-optional.md b/docs/adr/ADR-0003-postgres-canonical-sqlite-optional.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0004-durable-workflow-abstraction.md b/docs/adr/ADR-0004-durable-workflow-abstraction.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0005-opa-rego-policy-as-code.md b/docs/adr/ADR-0005-opa-rego-policy-as-code.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0006-no-raw-shell.md b/docs/adr/ADR-0006-no-raw-shell.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0007-wasi-container-microvm.md b/docs/adr/ADR-0007-wasi-container-microvm.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0008-signed-action-attestation.md b/docs/adr/ADR-0008-signed-action-attestation.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0009-interchangeable-model-providers.md b/docs/adr/ADR-0009-interchangeable-model-providers.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0010-mcp-tools-a2a-agents.md b/docs/adr/ADR-0010-mcp-tools-a2a-agents.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0011-opentelemetry-observability.md b/docs/adr/ADR-0011-opentelemetry-observability.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/adr/ADR-0012-content-addressed-evidence.md b/docs/adr/ADR-0012-content-addressed-evidence.md
++(12 ADR files in docs/adr/)
+diff --git a/docs/migration/SENTINEL_INVENTORY.md b/docs/migration/SENTINEL_INVENTORY.md
+new file mode 100644
+--- /dev/null
++++ b/docs/migration/SENTINEL_INVENTORY.md
++(Sentinel families classification)
+diff --git a/.project/tasks/AU-M00-L01/ b/.project/tasks/AU-M00-L01/
+new file mode 100644
+--- /dev/null
++++ b/.project/tasks/AU-M00-L01/
++(task folder evidence)
