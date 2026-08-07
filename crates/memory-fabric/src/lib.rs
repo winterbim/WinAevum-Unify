@@ -12,6 +12,7 @@ pub mod multitenant;
 pub mod native;
 pub mod promotion;
 pub mod scope;
+pub mod slop_ingest;
 pub mod sqlite;
 
 pub use assembly::{assemble, AssembledContext, AssemblyRequest, RankedHit};
@@ -28,6 +29,7 @@ pub use multitenant::MultiTenantStore;
 pub use native::NativeBackend;
 pub use promotion::{ingest_remote_as_inference, promote_to_authorize};
 pub use scope::TenantScope;
+pub use slop_ingest::{ingest_slop_report, SlopFinding, SlopReport};
 pub use sqlite::SqliteBackend;
 
 /// Open the autonomous local backend (SQLite by default; JSON if `AEVUM_GRAPH_STORE=json`).

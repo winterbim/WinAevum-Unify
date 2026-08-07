@@ -1,7 +1,26 @@
-# WinAevum-Unify — Local-First Trusted Autonomy
+# WinAevum-Unify — Local-First Trusted Autonomy × Anti-Slop
 
-**WinAevum-Unify** (Aevum Unify) is a local-first **Audit & Authority** stack: every agent side-effect
-must be authorized, attested, and packageable before it lands on your system.
+**WinAevum-Unify** is the first stack that unifies:
+
+1. **Trusted Autonomy** — authorize · attest · package (temporal evidence graph, epistemic firewall)
+2. **Deterministic AI-slop firewall** — [slopcheck](https://github.com/winterbim/slopcheck) findings bind into the same graph as **Inference only** (never authorize)
+
+No memory vendor. No LLM-as-authority. Offline by default.
+
+**Product category:** Trusted Autonomy + Anti-Slop Evidence  
+**Repo:** https://github.com/winterbim/WinAevum-Unify
+
+## What ships
+
+| Layer | Contents |
+|---|---|
+| Rust trust path | identity, attestation, ledger, sentinel, capabilities, TemporalGraph, memory-fabric (SQLite multi-tenant), `unify` CLI |
+| Anti-slop | `unify slop` → slopcheck → Inference episodes; Golden Path gate by default |
+| Proof benches | AgentTrustBench **16/16**, MemoryTruthBench **9/9** offline |
+| MCP | `aevum-mcp` incl. `aevum_slop_scan` |
+| UI | Mission Control |
+
+License: **MIT OR Apache-2.0**.
 
 **Product category:** Trusted Autonomy (authorize · attest · package)  
 **Not:** a third-party agent-memory clone. Memory is a native SQLite plane
@@ -12,7 +31,7 @@ behind an epistemic firewall (ADR-0018).
 | Layer | Contents |
 |---|---|
 | Rust trust path | identity, attestation, ledger, sentinel-kernel, capability-engine, secret-broker, autonomy-governor, evidence-graph (`TemporalGraph`), memory-fabric (SQLite+FTS5), git-provider, `unify` CLI |
-| Proof benches | AgentTrustBench (15/15), MemoryTruthBench (9/9 offline) |
+| Proof benches | AgentTrustBench (16/16), MemoryTruthBench (9/9 offline) |
 | MCP | `aevum-mcp` stdio JSON-RPC tools on the real trust path |
 | Contracts | `@aevum/contracts` TypeScript types (constitution, risk, policy, temporal graph) |
 | UI | Mission Control (Vite/React) — missions, graph, golden path, ledger |
@@ -28,8 +47,11 @@ pnpm -r lint && pnpm -r build && pnpm -r test
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 15/15
+cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 16/16
 cargo run -p aevum-memory-truth-bench   # AEVUM_MEMORY_PERFECT 9/9
+# Dual plane: trust on a repo + slop on WinAevum itself
+unify slop --mission ./mission --repo . --all
+SLOPCHECK_BIN=~/slopcheck/.venv/bin/slopcheck unify slop --mission ./mission --repo ~/slopcheck --all
 bash scripts/aevum-on-aevum.sh          # dogfood PASS
 python3 scripts/ledger_check.py .project/LEDGER.md
 ```

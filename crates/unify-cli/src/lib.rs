@@ -7,6 +7,7 @@
 
 pub mod golden;
 pub mod graph_cmd;
+pub mod slop;
 
 use std::fs;
 use std::path::Path;
@@ -76,7 +77,9 @@ pub fn print_help() {
     println!("  unify context      --mission <dir> --query <text> [--capability <cap>]");
     println!("  unify falsify      --mission <dir> --reason <text>   # required for R3+");
     println!("  unify approve      --mission <dir> [--decision approved]");
-    println!("  unify golden       --mission <dir> --repo <path> [--title …] [--run-tests]");
+    println!("  unify golden       --mission <dir> --repo <path> [--title …] [--run-tests] [--slop-gate]");
+    println!("  unify slop         --mission <dir> [--repo <path>] [--all|--base <ref>]");
+    println!("                     # AI-slop firewall → Inference on graph (never authorizes)");
     println!("  unify mcp          --mission <dir>   # stdio MCP server (trust path)");
     println!("                     (temporal trust graph — gates run/exec)");
 }

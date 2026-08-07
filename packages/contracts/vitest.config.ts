@@ -4,7 +4,8 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
-    // Constrain workers — avoids tinypool min/max conflicts in sandbox/CI.
+    // Path contains spaces ("aevum unifiy") — forks/tinypool teardown stack-overflows.
+    pool: "threads",
     fileParallelism: false,
     maxWorkers: 1,
     minWorkers: 1,

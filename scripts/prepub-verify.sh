@@ -20,7 +20,7 @@ echo "==> AgentTrustBench"
 out="$(cargo run -p aevum-agent-trust-bench --quiet 2>&1)"
 echo "$out" | tail -3
 echo "$out" | grep -q '"verdict": "AEVUM_PERFECT"' || die "ATB verdict"
-echo "$out" | grep -q 'AgentTrustBench: 15/15' || die "ATB 15/15"
+echo "$out" | grep -q 'AgentTrustBench: 16/16' || die "ATB 16/16"
 
 echo "==> MemoryTruthBench"
 out="$(cargo run -p aevum-memory-truth-bench --quiet 2>&1)"
@@ -35,7 +35,7 @@ echo "==> ledger"
 python3 scripts/ledger_check.py .project/LEDGER.md
 
 echo "==> pnpm"
-pnpm install --frozen-lockfile
+CI=1 pnpm install --frozen-lockfile
 pnpm -r lint
 pnpm -r build
 pnpm -r test

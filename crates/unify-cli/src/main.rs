@@ -27,6 +27,7 @@ fn main() -> ExitCode {
         "falsify" => aevum_unify::graph_cmd::cmd_falsify(&argv[2..]),
         "approve" => aevum_unify::graph_cmd::cmd_approve(&argv[2..]),
         "golden" => aevum_unify::golden::cmd_golden(&argv[2..]),
+        "slop" => aevum_unify::slop::cmd_slop(&argv[2..]),
         "--help" | "-h" | "help" => {
             aevum_unify::print_help();
             return ExitCode::SUCCESS;

@@ -55,6 +55,31 @@ pub fn cmd_golden(args: &[String]) -> Result<(), CliError> {
 
     require_authorized(&mission, "git.branch.create")?;
 
+    // 0) Unprecedented: offline AI-slop firewall bound to trust graph (default ON)
+    let skip_slop = args.iter().any(|a| a == "--no-slop-gate");
+    let want_slop = args.iter().any(|a| a == "--slop-gate") || !skip_slop;
+    if want_slop {
+        match crate::slop::cmd_slop(&[
+            "--mission".into(),
+            mission.clone(),
+            "--repo".into(),
+            repo.clone(),
+            "--all".into(),
+        ]) {
+            Ok(()) => println!("✓ slop gate clean"),
+            Err(e) => {
+                // If slopcheck missing, soft-warn unless --slop-gate forced
+                if e.to_string().contains("slopcheck not found")
+                    && !args.iter().any(|a| a == "--slop-gate")
+                {
+                    println!("⚠ slop gate skipped (slopcheck not installed) — set SLOPCHECK_BIN or pass --slop-gate");
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
     // 1) Create side branch (never main)
     let mut git = LocalGit::new();
     let repo_handle = MemoryRepo::new(&repo, "main");

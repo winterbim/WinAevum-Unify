@@ -24,6 +24,7 @@ The full content of each ADR lives in `docs/adr/ADR-NNNN-*.md`.
 | ADR-0017 | P3 RRF + local cross-encoder | adopted | 2026-08-07 |
 | ADR-0018 | Native-only memory fabric | adopted | 2026-08-07 |
 | ADR-0019 | Native multi-tenant memory scale | adopted | 2026-08-07 |
+| ADR-0020 | Trusted Autonomy ∩ AI-Slop Firewall | adopted | 2026-08-08 |
 
 ## Closed loops (M0)
 

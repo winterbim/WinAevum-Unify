@@ -138,6 +138,20 @@ fn tool_defs() -> Vec<Value> {
             "Verify mission trust ledger chain",
             json!({ "type": "object", "properties": {}, "additionalProperties": false }),
         ),
+        tool(
+            "aevum_slop_scan",
+            "Run offline AI-slop firewall (slopcheck) and ingest findings as Inference only — never authorizes",
+            json!({
+                "type": "object",
+                "properties": {
+                    "repo": { "type": "string", "description": "repo path to scan (default .)" },
+                    "all": { "type": "boolean", "default": true },
+                    "base": { "type": "string", "description": "optional git base ref" },
+                    "warn_only": { "type": "boolean", "default": false }
+                },
+                "additionalProperties": false
+            }),
+        ),
     ]
 }
 
@@ -337,6 +351,36 @@ pub fn dispatch(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, Strin
         "aevum_verify" => {
             quiet(|| aevum_unify::cmd_verify(&[mission.to_string()])).map_err(|e| e.to_string())?;
             Ok(json!({"ok": true}).to_string())
+        }
+        "aevum_slop_scan" => {
+            let repo = args
+                .get("repo")
+                .and_then(|v| v.as_str())
+                .unwrap_or(".")
+                .to_string();
+            let mut cmd = vec![
+                "--mission".into(),
+                mission.to_string(),
+                "--repo".into(),
+                repo,
+            ];
+            if args
+                .get("warn_only")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
+                cmd.push("--warn-only".into());
+            }
+            if let Some(base) = args.get("base").and_then(|v| v.as_str()) {
+                cmd.push("--base".into());
+                cmd.push(base.to_string());
+            } else if args.get("all").and_then(|v| v.as_bool()).unwrap_or(true) {
+                cmd.push("--all".into());
+            }
+            quiet(|| aevum_unify::slop::cmd_slop(&cmd)).map_err(|e| e.to_string())?;
+            let report_path = ctx.mission_dir.join("slop-report.json");
+            let body = std::fs::read_to_string(&report_path).unwrap_or_else(|_| "{}".into());
+            Ok(body)
         }
         other => Err(format!("unknown tool: {other}")),
     }

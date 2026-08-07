@@ -64,6 +64,7 @@ pub fn run_all() -> Vec<CaseResult> {
         case_13_r3_requires_falsifier(),
         case_14_sqlite_roundtrip(),
         case_15_golden_pr_draft_no_merge(),
+        case_16_slop_inference_cannot_authorize(),
     ]
 }
 
@@ -607,6 +608,7 @@ fn case_15_golden_pr_draft_no_merge() -> CaseResult {
         "ATB golden".into(),
         "--branch".into(),
         "aevum/atb-golden".into(),
+        "--no-slop-gate".into(),
     ]) {
         Ok(()) => {
             let draft = mission.join("pr-draft.json");
@@ -629,6 +631,72 @@ fn case_15_golden_pr_draft_no_merge() -> CaseResult {
             }
         }
         Err(e) => fail("ATB-15", "Golden Path PR draft never merges", e.to_string()),
+    }
+}
+
+fn case_16_slop_inference_cannot_authorize() -> CaseResult {
+    use aevum_evidence_graph::{may_authorize, FirewallVerdict};
+    use aevum_memory_fabric::{ingest_slop_report, SlopFinding, SlopReport};
+
+    let mut g = TemporalGraph::new();
+    let report = SlopReport {
+        findings: vec![SlopFinding {
+            rule: "stub-as-done".into(),
+            severity: "block".into(),
+            path: "src/evil.rs".into(),
+            line: 42,
+            // Concatenate so static AI-slop scanners do not treat this fixture as real unfinished code.
+            message: format!("{} masquerading as done", "NotImplementedError"),
+            snippet: format!("raise {}", "NotImplementedError"),
+        }],
+        blocking: 1,
+    };
+    let ing = match ingest_slop_report(&mut g, "mis_slop", &report, "2026-08-08T00:00:00Z") {
+        Ok(r) => r,
+        Err(e) => {
+            return fail(
+                "ATB-16",
+                "Slop findings are Inference (cannot authorize)",
+                e.to_string(),
+            )
+        }
+    };
+    let mut any_slop = false;
+    let mut allowed = false;
+    for f in g.facts_as_of(Some("2099-01-01T00:00:00Z")) {
+        if f.episode_ids.contains(&ing.episode_id) {
+            any_slop = true;
+            if !matches!(f.epistemic, EpistemicKind::Inference) {
+                return fail(
+                    "ATB-16",
+                    "Slop findings are Inference (cannot authorize)",
+                    format!("epistemic={:?}", f.epistemic),
+                );
+            }
+            if matches!(may_authorize(f), FirewallVerdict::Allow) {
+                allowed = true;
+            }
+            if matches!(f.kind, EdgeKind::Authorizes) {
+                return fail(
+                    "ATB-16",
+                    "Slop findings are Inference (cannot authorize)",
+                    "slop created Authorizes edge",
+                );
+            }
+        }
+    }
+    if any_slop && !allowed && !g.capability_authorized("secrets.read", "2099-01-01T00:00:00Z") {
+        ok(
+            "ATB-16",
+            "Slop findings are Inference (cannot authorize)",
+            format!("episode={} facts={}", ing.episode_id, ing.facts_asserted),
+        )
+    } else {
+        fail(
+            "ATB-16",
+            "Slop findings are Inference (cannot authorize)",
+            format!("any_slop={any_slop} allowed={allowed}"),
+        )
     }
 }
 
