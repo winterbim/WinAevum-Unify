@@ -17,6 +17,13 @@ The full content of each ADR lives in `docs/adr/ADR-NNNN-*.md`.
 | ADR-0010 | Interchangeable model providers                   | adopted  | 2026-08-02   |
 | ADR-0011 | MCP for tools, A2A for agents                     | adopted  | 2026-08-02   |
 | ADR-0012 | OpenTelemetry for observability                   | adopted  | 2026-08-02   |
+| ADR-0013 | Temporal Decision & Evidence Graph | adopted | 2026-08-07 |
+| ADR-0014 | Memory Fabric + MCP choke-point + AgentTrustBench | adopted | 2026-08-07 |
+| ADR-0015 | P1 SQLite + embeddings + Golden Path + falsifier | adopted | 2026-08-07 |
+| ADR-0016 | Native Superior Memory (P2) | adopted | 2026-08-07 |
+| ADR-0017 | P3 RRF + local cross-encoder | adopted | 2026-08-07 |
+| ADR-0018 | Native-only memory fabric | adopted | 2026-08-07 |
+| ADR-0019 | Native multi-tenant memory scale | adopted | 2026-08-07 |
 
 ## Closed loops (M0)
 

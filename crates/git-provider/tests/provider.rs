@@ -57,12 +57,28 @@ fn local_git_creates_real_branch_in_a_repo() {
     // to operate on.
     let tmp = TempDir::new().unwrap();
     let repo_path = tmp.path().to_str().unwrap();
-    std::process::Command::new("git").args(["init", "--initial-branch=main"]).arg(repo_path).output().expect("git init");
-    std::process::Command::new("git").args(["-C", repo_path, "config", "user.email", "test@aevum"]).output().unwrap();
-    std::process::Command::new("git").args(["-C", repo_path, "config", "user.name", "aevum"]).output().unwrap();
+    std::process::Command::new("git")
+        .args(["init", "--initial-branch=main"])
+        .arg(repo_path)
+        .output()
+        .expect("git init");
+    std::process::Command::new("git")
+        .args(["-C", repo_path, "config", "user.email", "test@aevum"])
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["-C", repo_path, "config", "user.name", "aevum"])
+        .output()
+        .unwrap();
     std::fs::write(tmp.path().join("README.md"), "# init").unwrap();
-    std::process::Command::new("git").args(["-C", repo_path, "add", "README.md"]).output().unwrap();
-    std::process::Command::new("git").args(["-C", repo_path, "commit", "-m", "init"]).output().unwrap();
+    std::process::Command::new("git")
+        .args(["-C", repo_path, "add", "README.md"])
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["-C", repo_path, "commit", "-m", "init"])
+        .output()
+        .unwrap();
 
     let mut g = aevum_git_provider::LocalGit::new();
     let result = g
@@ -90,5 +106,8 @@ fn local_git_surfaces_process_errors() {
     let result = g.create_branch_on(&MemoryRepo::new(bad_path, "main"), "aevum/x");
     assert!(result.is_err());
     let err = format!("{}", result.unwrap_err());
-    assert!(!err.contains("argv"), "should be a real process error, got: {err}");
+    assert!(
+        !err.contains("argv"),
+        "should be a real process error, got: {err}"
+    );
 }

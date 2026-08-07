@@ -10,7 +10,10 @@ members = [
   "crates/autonomy-governor",
   "crates/unify-cli",
   "crates/git-provider",
-
+  "crates/memory-fabric",
+  "crates/aevum-mcp",
+  "crates/agent-trust-bench",
+  "crates/memory-truth-bench",
 ]
 resolver = "2"
 
@@ -19,7 +22,7 @@ version = "0.1.0-m0"
 edition = "2021"
 rust-version = "1.82"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/winterbim/aevum-unify"
+repository = "https://github.com/winterbim/WinAevum-Unify"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -31,3 +34,4 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1"
 sha2 = "0.10"
 ed25519-dalek = { version = "2", features = ["serde"] }
+hex = "0.4"

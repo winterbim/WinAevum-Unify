@@ -75,9 +75,11 @@ export function GoldenPathView() {
           ))}
         </div>
         <div className="card-b" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="btn primary" disabled={steps[7].status !== "active"}>{steps[7].status === "done" ? "PR already opened" : "Open PR (no merge)"}</button>
-          {m && pr ? <a className="btn ghost" href={pr} target="_blank" rel="noreferrer">Mock PR #{m.id.replace(/[^0-9]/g, "")}</a> : null}
-          <span style={{ color: "var(--text-faint)", fontSize: 11, marginLeft: 6 }}>PR is opened by the Edge agent; humans review and merge only after the Gate votes Allow.</span>
+          <button className="btn primary" disabled={steps[7].status !== "active"}>{steps[7].status === "done" ? "PR draft ready" : "Prepare PR draft (no merge)"}</button>
+          {m && pr ? <a className="btn ghost" href={pr} target="_blank" rel="noreferrer">Open compare URL</a> : null}
+          <span style={{ color: "var(--text-faint)", fontSize: 11, marginLeft: 6 }}>
+            CLI: <code>unify golden --mission … --repo …</code> writes <code>pr-draft.json</code>; never auto-merges. R3+ needs <code>unify falsify</code> + <code>unify approve</code>.
+          </span>
         </div>
       </div>
 

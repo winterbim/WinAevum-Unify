@@ -16,17 +16,37 @@ jobs:
           toolchain: 1.82.0
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: crates
       - name: Format check
         run: cargo fmt --all -- --check
-        working-directory: crates
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-        working-directory: crates
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test --all-features
-        working-directory: crates
+        run: cargo test --workspace
+      - name: AgentTrustBench
+        run: cargo run -p aevum-agent-trust-bench --quiet
+      - name: MemoryTruthBench
+        run: cargo run -p aevum-memory-truth-bench --quiet
+
+  dogfood:
+    runs-on: ubuntu-latest
+    needs: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.82.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+      - name: Aevum-on-Aevum
+        run: bash scripts/aevum-on-aevum.sh
 
   web:
     runs-on: ubuntu-latest

@@ -206,14 +206,32 @@ mod tests {
     fn local_git_returns_real_branch_ref() {
         let tmp = TempDir::new().unwrap();
         let p = tmp.path().to_str().unwrap();
-        std::process::Command::new("git").args(["init", "--initial-branch=main"]).arg(p).output().unwrap();
-        std::process::Command::new("git").args(["-C", p, "config", "user.email", "t@t"]).output().unwrap();
-        std::process::Command::new("git").args(["-C", p, "config", "user.name", "t"]).output().unwrap();
+        std::process::Command::new("git")
+            .args(["init", "--initial-branch=main"])
+            .arg(p)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", p, "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", p, "config", "user.name", "t"])
+            .output()
+            .unwrap();
         std::fs::write(tmp.path().join("f"), "x").unwrap();
-        std::process::Command::new("git").args(["-C", p, "add", "f"]).output().unwrap();
-        std::process::Command::new("git").args(["-C", p, "commit", "-m", "i"]).output().unwrap();
+        std::process::Command::new("git")
+            .args(["-C", p, "add", "f"])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", p, "commit", "-m", "i"])
+            .output()
+            .unwrap();
         let mut g = LocalGit::new();
-        let r = g.create_branch_on(&MemoryRepo::new(p, "main"), "aevum/x").unwrap();
+        let r = g
+            .create_branch_on(&MemoryRepo::new(p, "main"), "aevum/x")
+            .unwrap();
         assert_eq!(r, "refs/heads/aevum/x");
     }
 }

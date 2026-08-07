@@ -59,6 +59,10 @@ fn new_writes_mission_directory_and_prints_authority() {
     assert_eq!(v["mission"]["risk"], "R2");
     assert!(out_dir.join("ledger.jsonl").exists());
     assert!(out_dir.join("policy.bundle.json").exists());
+    assert!(
+        out_dir.join("graph.json").exists(),
+        "temporal graph must be seeded"
+    );
     assert!(v["policy_bundle_digest"]
         .as_str()
         .unwrap()
@@ -508,7 +512,25 @@ fn run_appends_to_ledger_jsonl() {
         ])
         .output()
         .unwrap();
-    // Second run.
+    // Second run requires explicit authorize (not in constitution seed).
+    let auth = bin()
+        .args([
+            "graph",
+            "authorize",
+            "--mission",
+            mission.to_str().unwrap(),
+            "--capability",
+            "git.commit",
+            "--reason",
+            "self-test authorize commit",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        auth.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&auth.stderr)
+    );
     bin()
         .args([
             "run",
@@ -569,6 +591,17 @@ fn verify_walks_chain_and_proves_integrity() {
         .unwrap();
     bin()
         .args([
+            "graph",
+            "authorize",
+            "--mission",
+            mission.to_str().unwrap(),
+            "--capability",
+            "fs.write",
+        ])
+        .output()
+        .unwrap();
+    bin()
+        .args([
             "run",
             "--mission",
             mission.to_str().unwrap(),
@@ -590,4 +623,82 @@ fn verify_walks_chain_and_proves_integrity() {
         "stdout: {stdout}"
     );
     assert!(stdout.contains("2 entries"), "stdout: {stdout}");
+}
+
+#[test]
+fn run_rejects_unauthorized_capability() {
+    let tmp = TempDir::new().unwrap();
+    let constitution = write_min_constitution(tmp.path(), "mis_unauth");
+    let mission = tmp.path().join("mission");
+    bin()
+        .args([
+            "new",
+            "--constitution",
+            constitution.to_str().unwrap(),
+            "--out",
+            mission.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let output = bin()
+        .args([
+            "run",
+            "--mission",
+            mission.to_str().unwrap(),
+            "--capability",
+            "secrets.read",
+            "--argv",
+            "cat /etc/shadow",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        err.contains("not authorized") || err.contains("temporal graph"),
+        "stderr: {err}"
+    );
+}
+
+#[test]
+fn graph_status_and_search_work() {
+    let tmp = TempDir::new().unwrap();
+    let constitution = write_min_constitution(tmp.path(), "mis_graph");
+    let mission = tmp.path().join("mission");
+    bin()
+        .args([
+            "new",
+            "--constitution",
+            constitution.to_str().unwrap(),
+            "--out",
+            mission.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let status = bin()
+        .args(["graph", "status", "--mission", mission.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(
+        status.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let out = String::from_utf8_lossy(&status.stdout);
+    assert!(out.contains("episodes:"));
+    assert!(out.contains("ALLOW"));
+
+    let search = bin()
+        .args([
+            "graph",
+            "search",
+            "--mission",
+            mission.to_str().unwrap(),
+            "--query",
+            "constitution authorizes",
+        ])
+        .output()
+        .unwrap();
+    assert!(search.status.success());
+    assert!(String::from_utf8_lossy(&search.stdout).contains("hit"));
 }

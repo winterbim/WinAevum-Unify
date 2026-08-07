@@ -3,7 +3,7 @@
   "version": "0.1.0-m0",
   "private": true,
   "type": "module",
-  "description": "Shared contracts between Mission Control, agent SDKs and the Sentinel Kernel (M0 skeleton).",
+  "description": "Shared contracts between Mission Control, agent SDKs and the Sentinel Kernel.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -14,7 +14,8 @@
     "./evidence": "./src/evidence.ts",
     "./capability": "./src/capability.ts",
     "./execution-lease": "./src/execution-lease.ts",
-    "./receipt": "./src/receipt.ts"
+    "./receipt": "./src/receipt.ts",
+    "./temporal-graph": "./src/temporal-graph.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

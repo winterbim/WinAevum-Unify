@@ -5,6 +5,9 @@
 //! without paying the cost of spawning a process. The binary in `main.rs`
 //! only parses argv and dispatches to one of these functions.
 
+pub mod golden;
+pub mod graph_cmd;
+
 use std::fs;
 use std::path::Path;
 
@@ -69,6 +72,13 @@ pub fn print_help() {
     println!("  unify package        --mission <dir> --out <file.json>");
     println!("  unify verify-package <file.json>");
     println!("  unify exec         --mission <dir> --capability <name> --argv <token> [--argv <token>...]");
+    println!("  unify graph        <status|search|as-of|authorize|add-episode> ...");
+    println!("  unify context      --mission <dir> --query <text> [--capability <cap>]");
+    println!("  unify falsify      --mission <dir> --reason <text>   # required for R3+");
+    println!("  unify approve      --mission <dir> [--decision approved]");
+    println!("  unify golden       --mission <dir> --repo <path> [--title …] [--run-tests]");
+    println!("  unify mcp          --mission <dir>   # stdio MCP server (trust path)");
+    println!("                     (temporal trust graph — gates run/exec)");
 }
 
 pub fn cmd_new(args: &[String]) -> Result<(), CliError> {
@@ -121,6 +131,21 @@ pub fn cmd_new(args: &[String]) -> Result<(), CliError> {
     let meta_path = Path::new(&out_dir).join("metadata.json");
     fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
         .map_err(|e| CliError::Io(format!("writing metadata: {e}")))?;
+    // Temporal trust graph seeded from constitution (ADR-0013) + SQLite twin (P1).
+    graph_cmd::seed_and_persist(
+        &out_dir,
+        &mission_id,
+        &src,
+        &meta.mission.constitution_digest,
+    )?;
+    // Durable SQLite twin (P1) — migrates from graph.json on first open.
+    {
+        use aevum_memory_fabric::{MemoryBackend, SqliteBackend};
+        let sb = SqliteBackend::open(&out_dir)
+            .map_err(|e| CliError::Verify(format!("sqlite seed: {e}")))?;
+        sb.save()
+            .map_err(|e| CliError::Verify(format!("sqlite save: {e}")))?;
+    }
     println!(
         "mission {mission_id} created at {out_dir} (risk={risk_label}, authority={})",
         authority.spiffe_id
@@ -132,7 +157,11 @@ pub fn cmd_run(args: &[String]) -> Result<(), CliError> {
     let mission_dir = require_value(args, "--mission")?;
     let capability = require_value(args, "--capability")?;
     let argv_str = require_value(args, "--argv")?;
+    graph_cmd::require_authorized(&mission_dir, &capability)?;
     let meta = load_metadata(&mission_dir)?;
+    if let Some(rc) = aevum_autonomy_governor::RiskClass::from_label(&meta.mission.risk) {
+        graph_cmd::require_falsifier_if_needed(&mission_dir, rc)?;
+    }
     let authority_key = KeyMaterial::from_secret_hex(&meta.authority_secret_key_hex)
         .map_err(|e| CliError::Verify(format!("authority secret key parse: {e}")))?;
     let actor = Identity {
@@ -360,6 +389,16 @@ pub fn cmd_package(args: &[String]) -> Result<(), CliError> {
         "ledger_entries".into(),
         serde_json::Value::String(ledger_entries.clone()),
     );
+    let graph_digest = if graph_cmd::graph_path(&mission).exists() {
+        let graw = fs::read_to_string(graph_cmd::graph_path(&mission)).unwrap_or_default();
+        sha256_hex(&graw)
+    } else {
+        "sha256:none".into()
+    };
+    pkg.insert(
+        "temporal_graph_digest".into(),
+        serde_json::Value::String(graph_digest),
+    );
     let placeholder = serde_json::Value::Object(pkg);
     let text = serde_json::to_string_pretty(&placeholder).unwrap();
     let digest = sha256_hex(&text);
@@ -382,7 +421,11 @@ pub fn cmd_exec(args: &[String]) -> Result<(), CliError> {
     if argv.is_empty() {
         return Err(CliError::Missing("--argv".into()));
     }
+    graph_cmd::require_authorized(&mission_dir, &capability)?;
     let meta = load_metadata(&mission_dir)?;
+    if let Some(rc) = aevum_autonomy_governor::RiskClass::from_label(&meta.mission.risk) {
+        graph_cmd::require_falsifier_if_needed(&mission_dir, rc)?;
+    }
     let authority_key = KeyMaterial::from_secret_hex(&meta.authority_secret_key_hex)
         .map_err(|e| CliError::Verify(format!("authority secret key parse: {e}")))?;
     let actor = Identity {
@@ -413,7 +456,13 @@ pub fn cmd_exec(args: &[String]) -> Result<(), CliError> {
         .map_err(|e| CliError::Io(format!("spawn {cmd}: {e}")))?;
     let exit_code = output.status.code().unwrap_or(-1);
     let argv_for_log = argv.join(" ");
-    append_audit_trail(&mission_dir, &actor.spiffe_id, &capability, &argv_for_log, "exec")?;
+    append_audit_trail(
+        &mission_dir,
+        &actor.spiffe_id,
+        &capability,
+        &argv_for_log,
+        "exec",
+    )?;
     println!("✓ exec argv[0]={cmd} exit={exit_code} audit_record_id=exec");
     if exit_code != 0 {
         return Err(CliError::Verify(format!(
@@ -441,7 +490,7 @@ fn collect_all_argv(args: &[String]) -> Vec<String> {
 
 const SHELL_METACHARS: &[&str] = &[";", "&", "|", "$", "`", ">", "<", "*", "?", "!", "\n", "\r"];
 
-fn chrono_now_iso() -> String {
+pub(crate) fn chrono_now_iso() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -12,6 +12,7 @@ import { LedgerView } from "./views/LedgerView";
 import { SettingsView } from "./views/SettingsView";
 import { GoldenPathView } from "./views/GoldenPathView";
 import { PackagesView } from "./views/PackagesView";
+import { GraphView } from "./views/GraphView";
 import { store } from "./store";
 
 const NAV: Array<{ id: string; label: string; section: string }> = [
@@ -21,6 +22,7 @@ const NAV: Array<{ id: string; label: string; section: string }> = [
   { id: "evidence", label: "Evidence", section: "Authority" },
   { id: "actions", label: "Actions", section: "Authority" },
   { id: "policies", label: "Policies", section: "Authority" },
+  { id: "graph", label: "Temporal Graph", section: "Authority" },
   { id: "approvals", label: "Approvals", section: "Tenant" },
   { id: "ledger", label: "Trust Ledger", section: "Tenant" },
   { id: "settings", label: "Settings", section: "Tenant" },
@@ -47,6 +49,7 @@ function App() {
     case "evidence": body = <EvidenceView />; trail = ["authority", "evidence"]; break;
     case "actions": body = <ActionsView />; trail = ["authority", "actions"]; break;
     case "policies": body = <PoliciesView />; trail = ["authority", "policies"]; break;
+    case "graph": body = <GraphView />; trail = ["authority", "temporal graph"]; break;
     case "approvals": body = <ApprovalsView />; trail = ["tenant", "approvals"]; break;
     case "ledger": body = <LedgerView />; trail = ["tenant", "ledger"]; break;
     case "settings": body = <SettingsView />; trail = ["tenant", "settings"]; break;

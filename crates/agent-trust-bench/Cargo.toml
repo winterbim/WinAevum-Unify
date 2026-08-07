@@ -1,0 +1,24 @@
+[package]
+name = "aevum-agent-trust-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "AgentTrustBench v0 — adversarial trust cases for Aevum Unify"
+
+[[bin]]
+name = "agent-trust-bench"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tempfile = "3"
+aevum-evidence-graph = { path = "../evidence-graph" }
+aevum-memory-fabric = { path = "../memory-fabric" }
+aevum-unify = { path = "../unify-cli" }
+aevum-mcp = { path = "../aevum-mcp" }
+
+[dev-dependencies]
+tempfile = "3"
