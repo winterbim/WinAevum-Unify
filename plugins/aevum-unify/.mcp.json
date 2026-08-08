@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "winaevum-unify": {
+      "command": "aevum-mcp",
+      "args": ["--mission", "${AEVUM_MISSION}"],
+      "env": {
+        "AEVUM_MISSION": "${AEVUM_MISSION}",
+        "SLOPCHECK_BIN": "${SLOPCHECK_BIN}"
+      }
+    }
+  }
+}
