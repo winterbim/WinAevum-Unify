@@ -53,7 +53,7 @@ def main() -> int:
 
     # ATB
     atb = run(["cargo", "run", "-p", "aevum-agent-trust-bench", "--quiet"])
-    check("atb", "AgentTrustBench: 17/17" in atb.stdout + atb.stderr, "17/17")
+    check("atb", "AgentTrustBench: 18/18" in atb.stdout + atb.stderr, "18/18")
 
     # MCP tool count via list in-process is hard; grep source
     tools_rs = (ROOT / "crates" / "aevum-mcp" / "src" / "tools.rs").read_text()
@@ -65,9 +65,39 @@ def main() -> int:
         "aevum_rule_scan",
         "aevum_pretool_check",
         "aevum_slop_scan",
+        "aevum_doctor",
+        "aevum_agent_card",
     ]
     missing = [t for t in needed if t not in tools_rs]
     check("mcp_doctrine_tools", not missing, "missing=" + ",".join(missing) if missing else "all present")
+
+    # Agent dream layer: doctor + dream must be reachable, not just written down.
+    dream_rs = ROOT / "crates" / "unify-cli" / "src" / "dream.rs"
+    dream_src = dream_rs.read_text() if dream_rs.is_file() else ""
+    help_proc = run([str(unify), "--help"]) if unify.is_file() else None
+    help_text = (help_proc.stdout + help_proc.stderr) if help_proc else ""
+    for sub in ("doctor", "dream"):
+        in_help = f"unify {sub}" in help_text
+        in_src = f"cmd_{sub}" in dream_src
+        check(
+            f"agent_{sub}",
+            in_help or in_src,
+            "cli help" if in_help else ("dream.rs" if in_src else "absent"),
+        )
+
+    check(
+        "agent_dream_doc",
+        (ROOT / "docs" / "AGENT_DREAM.md").is_file(),
+        "docs/AGENT_DREAM.md",
+    )
+
+    # The loop must self-check and self-describe before it produces any effect.
+    loop_sh = (ROOT / "scripts" / "aevum-agent-loop.sh").read_text()
+    check(
+        "agent_loop_dream",
+        all(tok in loop_sh for tok in ("doctor --mission", "dream --mission", "AGENT_CARD")),
+        "doctor + dream + AGENT_CARD in agent loop",
+    )
 
     # PreToolUse D14 unit
     hook_py = hook

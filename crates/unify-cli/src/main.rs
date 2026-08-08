@@ -28,6 +28,8 @@ fn main() -> ExitCode {
         "approve" => aevum_unify::graph_cmd::cmd_approve(&argv[2..]),
         "golden" => aevum_unify::golden::cmd_golden(&argv[2..]),
         "slop" => aevum_unify::slop::cmd_slop(&argv[2..]),
+        "dream" => aevum_unify::dream::cmd_dream(&argv[2..]),
+        "doctor" => aevum_unify::dream::cmd_doctor(&argv[2..]),
         "rules" => {
             let rest = &argv[2..];
             if rest.first().map(|s| s.as_str()) == Some("scan") {

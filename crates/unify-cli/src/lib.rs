@@ -5,6 +5,7 @@
 //! without paying the cost of spawning a process. The binary in `main.rs`
 //! only parses argv and dispatches to one of these functions.
 
+pub mod dream;
 pub mod golden;
 pub mod graph_cmd;
 pub mod parallel;
@@ -79,6 +80,10 @@ pub fn print_help() {
     println!("  unify context      --mission <dir> --query <text> [--capability <cap>]");
     println!("  unify falsify      --mission <dir> --reason <text>   # required for R3+");
     println!("  unify approve      --mission <dir> [--decision approved]");
+    println!("  unify dream        --mission <dir> [--capability <cap>] [--query <text>]");
+    println!("                     # AGENT_CARD — what an agent needs to act safely");
+    println!("  unify doctor       --mission <dir>");
+    println!("                     # hard self-check (never silent failure)");
     println!("  unify golden       --mission <dir> --repo <path> [--title …] [--run-tests] [--slop-gate]");
     println!("  unify slop         --mission <dir> [--repo <path>] [--all|--base <ref>]");
     println!("                     # AI-slop firewall → Inference on graph (never authorizes)");

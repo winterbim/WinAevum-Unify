@@ -211,6 +211,23 @@ fn tool_defs() -> Vec<Value> {
             }),
         ),
         tool(
+            "aevum_doctor",
+            "Mission self-check (`unify doctor`): hard failures, soft warnings, verdict — never silent",
+            json!({ "type": "object", "properties": {}, "additionalProperties": false }),
+        ),
+        tool(
+            "aevum_agent_card",
+            "AGENT_CARD (`unify dream`): authorized capabilities, denied patterns, how to exec/package safely",
+            json!({
+                "type": "object",
+                "properties": {
+                    "capability": { "type": "string", "description": "narrow the card to one capability" },
+                    "query": { "type": "string", "description": "attach a trust-filtered context probe" }
+                },
+                "additionalProperties": false
+            }),
+        ),
+        tool(
             "aevum_pretool_check",
             "PreToolUse bridge: check whether a capability is authorized right now",
             json!({
@@ -527,6 +544,31 @@ pub fn dispatch(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, Strin
             })
             .map_err(|e| e.to_string())?;
             Ok(json!({"ok": true, "note": "rule hits ingested as Inference only"}).to_string())
+        }
+        "aevum_doctor" => match aevum_unify::dream::doctor_report(mission) {
+            Ok(report) => {
+                let body = serde_json::to_string_pretty(&report).unwrap();
+                let healthy = report
+                    .get("hard")
+                    .and_then(|v| v.as_array())
+                    .is_some_and(|a| a.is_empty());
+                // A sick mission must reach the agent as an error, not as a
+                // successful call whose body happens to say FAIL.
+                if healthy {
+                    Ok(body)
+                } else {
+                    Err(body)
+                }
+            }
+            Err(e) => Err(e.to_string()),
+        },
+        "aevum_agent_card" => {
+            let cap = args.get("capability").and_then(|v| v.as_str());
+            let query = args.get("query").and_then(|v| v.as_str());
+            match aevum_unify::dream::agent_card(mission, cap, query) {
+                Ok(card) => Ok(serde_json::to_string_pretty(&card).unwrap()),
+                Err(e) => Err(e.to_string()),
+            }
         }
         "aevum_pretool_check" => {
             let cap = arg_str(args, "capability")?;

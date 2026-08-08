@@ -49,3 +49,4 @@
 | L-39 | Native multi-tenant scale (ADR-0019): TenantScope + MultiTenantStore + WAL + MTB-08/09 | EVIDENCED | scope.rs + multitenant.rs; FTS mission_id; unify graph tenants; MTB 9/9; scale_managed=8 on scorecard |
 | L-40 | Unprecedented: Trusted Autonomy ∩ slopcheck firewall (ADR-0020) | EVIDENCED | unify slop; ingest_slop_report Inference-only; golden --slop-gate; MCP aevum_slop_scan; ATB-16; ATB 16/16; scripts/dual-dogfood.sh |
 | L-41 | Projet Phare: Trusted Autonomy Hub (ADR-0021) | EVIDENCED | package ledger+audit+slop digests; MCP package/golden/falsify/rules/pretool; plugins/aevum-unify; unify parallel; HUB_ADAPTERS; ATB 17/17; hub scorecard; aevum-agent-loop |
+| L-42 | Agent Dream layer: loud deny + doctor + agent card | EVIDENCED | unify doctor/dream; record_denial_episode; MCP aevum_doctor/aevum_agent_card; ATB-18; docs/AGENT_DREAM.md; agent-loop self-check; ATB 18/18 |

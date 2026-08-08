@@ -20,9 +20,10 @@ No memory vendor. No LLM-as-authority. No `bypassPermissions`. Offline by defaul
 | Rust trust path | identity, attestation, ledger, sentinel, TemporalGraph, memory-fabric, `unify` CLI |
 | Anti-slop + rules | `unify slop`, `unify rules scan` → Inference episodes |
 | Parallel | `unify parallel` — attested best-of-N (no auto-merge) |
-| Proof | AgentTrustBench **17/17**, MemoryTruthBench **9/9**, hub scorecard |
-| MCP | package / verify-package / golden / falsify / slop / rules / pretool_check |
+| Proof | AgentTrustBench **18/18**, MemoryTruthBench **9/9**, hub scorecard |
+| MCP | package / verify / golden / falsify / slop / rules / pretool / doctor / agent_card |
 | Plugin | [`plugins/aevum-unify`](plugins/aevum-unify) for Claude Code |
+| Dream | `unify doctor` + `unify dream` — loud denies, AGENT_CARD ([docs/AGENT_DREAM.md](docs/AGENT_DREAM.md)) |
 | UI | Mission Control — graph, golden path, packages, ledger |
 
 License: **MIT OR Apache-2.0**.
@@ -32,7 +33,7 @@ License: **MIT OR Apache-2.0**.
 ```bash
 pnpm install --frozen-lockfile && pnpm -r test
 cargo test --workspace
-cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 17/17
+cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 18/18
 cargo run -p aevum-memory-truth-bench   # AEVUM_MEMORY_PERFECT 9/9
 python3 scripts/benchmark-hub-scorecard.py
 bash scripts/aevum-on-aevum.sh
@@ -50,6 +51,8 @@ cargo build -p aevum-unify -p aevum-mcp
 ./target/debug/unify slop --mission ./mission --repo . --all
 ./target/debug/unify rules scan --mission ./mission --repo .
 ./target/debug/unify parallel --constitution constitution.json --out /tmp/aevum-p --n 3
+./target/debug/unify doctor --mission ./mission
+./target/debug/unify dream --mission ./mission
 ./target/debug/unify package --mission ./mission --out pkg.json
 ./target/debug/unify mcp --mission ./mission --write-config claude
 ```
@@ -72,7 +75,7 @@ crates/
   memory-fabric/      SQLite + slop/rules ingest (Inference)
   unify-cli/          unify binary (trust anchor)
   aevum-mcp/          MCP stdio choke-point
-  agent-trust-bench/  ATB 17/17
+  agent-trust-bench/  ATB 18/18
 plugins/aevum-unify/  Claude Code plugin + PreToolUse
 apps/mission-control/ UI
 ```
@@ -80,9 +83,9 @@ apps/mission-control/ UI
 ## Verify before publish
 
 ```bash
-bash scripts/prepub-verify.sh   # expects ATB 17/17
+bash scripts/prepub-verify.sh   # expects ATB 18/18
 ```
 
 ## Release
 
-Tag **v0.2.0-phare** when Phase 0–1 gates are green on `main`.
+Tag **v0.2.0-phare** when Phase 0–1 gates are green on `main`. Tag **v0.2.1-dream** when Agent Dream (ATB-18) is green.

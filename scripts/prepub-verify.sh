@@ -20,7 +20,7 @@ echo "==> AgentTrustBench"
 out="$(cargo run -p aevum-agent-trust-bench --quiet 2>&1)"
 echo "$out" | tail -3
 echo "$out" | grep -q '"verdict": "AEVUM_PERFECT"' || die "ATB verdict"
-echo "$out" | grep -q 'AgentTrustBench: 17/17' || die "ATB 17/17"
+echo "$out" | grep -q 'AgentTrustBench: 18/18' || die "ATB 18/18"
 
 echo "==> MemoryTruthBench"
 out="$(cargo run -p aevum-memory-truth-bench --quiet 2>&1)"

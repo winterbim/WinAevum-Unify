@@ -66,6 +66,7 @@ pub fn run_all() -> Vec<CaseResult> {
         case_15_golden_pr_draft_no_merge(),
         case_16_slop_inference_cannot_authorize(),
         case_17_package_binds_ledger_after_effects(),
+        case_18_dream_doctor_loud_deny(),
     ]
 }
 
@@ -453,7 +454,7 @@ fn case_12_mcp_initialize_tools() -> CaseResult {
         .and_then(|t| t.as_array())
         .cloned()
         .unwrap_or_default();
-    if tools.len() < 14 {
+    if tools.len() < 18 {
         return fail(
             "ATB-12",
             "MCP tools surface",
@@ -470,6 +471,8 @@ fn case_12_mcp_initialize_tools() -> CaseResult {
         "aevum_golden",
         "aevum_falsify",
         "aevum_slop_scan",
+        "aevum_doctor",
+        "aevum_agent_card",
     ] {
         if !names.contains(&need) {
             return fail(
@@ -481,12 +484,27 @@ fn case_12_mcp_initialize_tools() -> CaseResult {
     }
     let ctx = aevum_mcp::ToolCtx::new(mission);
     match aevum_mcp::tools::dispatch(&ctx, "aevum_graph_status", &serde_json::json!({})) {
-        Ok(body) if body.contains("episodes") => ok(
+        Ok(body) if body.contains("episodes") => {}
+        other => return fail("ATB-12", "MCP tools surface", format!("{other:?}")),
+    }
+    // The agent-facing tools must return real content, not just be listed.
+    match aevum_mcp::tools::dispatch(&ctx, "aevum_agent_card", &serde_json::json!({})) {
+        Ok(body) if body.contains("agent_card_version") => {}
+        other => {
+            return fail(
+                "ATB-12",
+                "MCP tools surface",
+                format!("agent_card {other:?}"),
+            )
+        }
+    }
+    match aevum_mcp::tools::dispatch(&ctx, "aevum_doctor", &serde_json::json!({})) {
+        Ok(body) if body.contains("AEVUM_DOCTOR_OK") => ok(
             "ATB-12",
             "MCP tools surface",
-            format!("{} tools + status ok", tools.len()),
+            format!("{} tools + status/card/doctor ok", tools.len()),
         ),
-        other => fail("ATB-12", "MCP tools surface", format!("{other:?}")),
+        other => fail("ATB-12", "MCP tools surface", format!("doctor {other:?}")),
     }
 }
 
@@ -775,6 +793,86 @@ fn case_17_package_binds_ledger_after_effects() -> CaseResult {
         "ATB-17",
         "Package binds non-empty ledger after effects",
         format!("ledger_bytes={} audit={}", ledger.len(), audit_d),
+    )
+}
+
+fn case_18_dream_doctor_loud_deny() -> CaseResult {
+    let tmp = tempfile::tempdir().unwrap();
+    let mission = new_mission(tmp.path(), "mis_c18");
+    let m = mission.to_str().unwrap();
+
+    match aevum_unify::dream::doctor_report(m) {
+        Ok(r) if r.get("verdict").and_then(|v| v.as_str()) == Some("AEVUM_DOCTOR_OK") => {}
+        other => {
+            return fail(
+                "ATB-18",
+                "Dream layer: doctor + agent card + loud deny",
+                format!("doctor not OK: {other:?}"),
+            )
+        }
+    }
+
+    let card = match aevum_unify::dream::agent_card(m, None, None) {
+        Ok(c) => c,
+        Err(e) => {
+            return fail(
+                "ATB-18",
+                "Dream layer: doctor + agent card + loud deny",
+                e.to_string(),
+            )
+        }
+    };
+    if card.get("agent_card_version").and_then(|v| v.as_str()) != Some("aevum.agent-card/v1") {
+        return fail(
+            "ATB-18",
+            "Dream layer: doctor + agent card + loud deny",
+            "missing agent_card_version",
+        );
+    }
+
+    let deny = aevum_unify::graph_cmd::require_authorized(m, "cap.never.exists");
+    if deny.is_ok() {
+        return fail(
+            "ATB-18",
+            "Dream layer: doctor + agent card + loud deny",
+            "expected deny for unknown capability",
+        );
+    }
+
+    let g = aevum_unify::graph_cmd::load_graph(m).unwrap();
+    let loud = g.to_snapshot().episodes.iter().any(|ep| {
+        ep.content.contains("DENIED_CAPABILITY") && ep.content.contains("cap.never.exists")
+    });
+    if !loud {
+        return fail(
+            "ATB-18",
+            "Dream layer: doctor + agent card + loud deny",
+            "denial episode not recorded",
+        );
+    }
+
+    let listed = aevum_mcp::list_tools_value();
+    let names: Vec<&str> = listed
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+        .collect();
+    for need in ["aevum_doctor", "aevum_agent_card"] {
+        if !names.contains(&need) {
+            return fail(
+                "ATB-18",
+                "Dream layer: doctor + agent card + loud deny",
+                format!("MCP missing {need}"),
+            );
+        }
+    }
+
+    ok(
+        "ATB-18",
+        "Dream layer: doctor + agent card + loud deny",
+        "doctor OK, card v1, denial episode, MCP tools",
     )
 }
 
