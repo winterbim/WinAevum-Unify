@@ -110,15 +110,32 @@ impl KeyMaterial {
     }
 
     pub fn verify(&self, signature_hex: &str, message: &[u8]) -> Result<(), KeyError> {
-        let sig_bytes: [u8; 64] = hex::decode(signature_hex)
-            .map_err(KeyError::from)?
-            .try_into()
-            .map_err(|v: Vec<u8>| KeyError::InvalidHexLength(v.len()))?;
-        let sig = Signature::from_bytes(&sig_bytes);
-        let vk: VerifyingKey = self.inner.verifying_key();
-        vk.verify(message, &sig)
-            .map_err(|_| KeyError::SignatureInvalid)
+        verify_signature_hex(
+            &hex::encode(self.public_bytes()),
+            signature_hex,
+            message,
+        )
     }
+}
+
+/// Verify an Ed25519 signature against a public key (hex) — no secret required.
+pub fn verify_signature_hex(
+    public_hex: &str,
+    signature_hex: &str,
+    message: &[u8],
+) -> Result<(), KeyError> {
+    let pk_bytes: [u8; 32] = hex::decode(public_hex.trim())
+        .map_err(KeyError::from)?
+        .try_into()
+        .map_err(|v: Vec<u8>| KeyError::InvalidHexLength(v.len()))?;
+    let vk = VerifyingKey::from_bytes(&pk_bytes).map_err(|_| KeyError::SignatureInvalid)?;
+    let sig_bytes: [u8; 64] = hex::decode(signature_hex.trim())
+        .map_err(KeyError::from)?
+        .try_into()
+        .map_err(|v: Vec<u8>| KeyError::InvalidHexLength(v.len()))?;
+    let sig = Signature::from_bytes(&sig_bytes);
+    vk.verify(message, &sig)
+        .map_err(|_| KeyError::SignatureInvalid)
 }
 
 #[derive(Clone, Debug)]

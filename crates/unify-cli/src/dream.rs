@@ -198,8 +198,34 @@ pub fn doctor_report(mission_dir: &str) -> Result<Value, CliError> {
         Err(e) => record("graph", "fail", format!("{GRAPH_FILE} unusable: {e}")),
     }
 
-    let audit = count_entries(&Path::new(mission_dir).join("audit_trail.jsonl"));
-    let ledger = count_entries(&Path::new(mission_dir).join("ledger.jsonl"));
+    let audit_path = Path::new(mission_dir).join("audit_trail.jsonl");
+    let ledger_path = Path::new(mission_dir).join("ledger.jsonl");
+    let audit = count_entries(&audit_path);
+    let ledger = count_entries(&ledger_path);
+    let ledger_raw = fs::read_to_string(&ledger_path).unwrap_or_default();
+    let pub_hex = crate::authority::load_authority_public_hex(mission_dir).unwrap_or_default();
+    match crate::verify_signed_ledger_text(&ledger_raw, &pub_hex, true) {
+        Ok(last) => {
+            if ledger > 0 {
+                if let Err(e) = crate::authority::verify_ledger_tip(mission_dir, &last, &pub_hex) {
+                    record("ledger_integrity", "fail", format!("tip/anchor: {e}"));
+                } else {
+                    record(
+                        "ledger_integrity",
+                        "ok",
+                        format!("{ledger} signed entr(y/ies), tip anchored"),
+                    );
+                }
+            } else {
+                record("ledger_integrity", "ok", "empty ledger".into());
+            }
+        }
+        Err(e) => record(
+            "ledger_integrity",
+            "fail",
+            format!("corrupt or unsigned ledger — agent must not proceed: {e}"),
+        ),
+    }
     if audit > 0 && ledger == 0 {
         record(
             "ledger_sync",
@@ -212,10 +238,10 @@ pub fn doctor_report(mission_dir: &str) -> Result<Value, CliError> {
     } else if ledger < audit {
         record(
             "ledger_sync",
-            "warn",
+            "fail",
             format!(
                 "ledger has {ledger} entry(ies) for {audit} audited effect(s) — \
-                 `unify package` resyncs them"
+                 not in sync (fail-closed)"
             ),
         );
     } else {

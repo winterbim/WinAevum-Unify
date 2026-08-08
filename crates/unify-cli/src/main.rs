@@ -30,6 +30,10 @@ fn main() -> ExitCode {
         "slop" => aevum_unify::slop::cmd_slop(&argv[2..]),
         "dream" => aevum_unify::dream::cmd_dream(&argv[2..]),
         "doctor" => aevum_unify::dream::cmd_doctor(&argv[2..]),
+        "debug-now" => aevum_unify::cmd_debug_now(&argv[2..]),
+        "human-keygen" => aevum_unify::authority::cmd_human_keygen(&argv[2..]),
+        "human-grant" => aevum_unify::authority::cmd_human_grant(&argv[2..]),
+        "pretool-check" => aevum_unify::cmd_pretool_check(&argv[2..]),
         "rules" => {
             let rest = &argv[2..];
             if rest.first().map(|s| s.as_str()) == Some("scan") {

@@ -36,7 +36,7 @@ pub fn save_graph(mission_dir: &str, g: &TemporalGraph) -> Result<(), CliError> 
     let snap = g.to_snapshot();
     let text = serde_json::to_string_pretty(&snap)
         .map_err(|e| CliError::Io(format!("serialize graph: {e}")))?;
-    fs::write(graph_path(mission_dir), text)
+    crate::atomic::atomic_write(&graph_path(mission_dir), text.as_bytes())
         .map_err(|e| CliError::Io(format!("writing graph.json: {e}")))?;
     // Keep SQLite twin in sync when durable store is enabled (default).
     let store = std::env::var("AEVUM_GRAPH_STORE").unwrap_or_else(|_| "sqlite".into());
@@ -279,7 +279,8 @@ fn print_graph_help() {
     println!("  unify graph status         --mission <dir>");
     println!("  unify graph search         --mission <dir> --query <text> [--as-of <iso>]");
     println!("  unify graph as-of          --mission <dir> --at <iso>");
-    println!("  unify graph authorize      --mission <dir> --capability <name> [--reason <text>]");
+    println!("  unify graph authorize      --mission <dir> --capability <name> --grant-sig <hex> [--reason <text>]");
+    println!("                             # P0-5: requires human grant (unify human-grant); self-authorize refused");
     println!("  unify graph add-episode    --mission <dir> --content <text|@file> [--source attested|text|json]");
     println!("  unify graph ingest         --mission <dir> --content <text|@file> [--at <iso>] [--format json|text] [--attested]");
     println!("  unify graph contradictions --mission <dir> [--as-of <iso>] [--resolve]");
@@ -407,6 +408,14 @@ fn graph_authorize(args: &[String]) -> Result<(), CliError> {
     let capability = require_value(args, "--capability")?;
     let reason = optional_value(args, "--reason")
         .unwrap_or_else(|| format!("explicit authorize for {capability}"));
+    let grant_sig = require_value(args, "--grant-sig").map_err(|_| {
+        CliError::Verify(
+            "graph authorize refuses self-authorize (P0-5): pass --grant-sig from \
+             `unify human-grant --mission-id … --capability …` signed by the human key \
+             outside the mission directory ($AEVUM_HUMAN_KEY / ~/.config/aevum/human.sk)"
+                .into(),
+        )
+    })?;
     let meta_txt = fs::read_to_string(Path::new(&mission).join("metadata.json"))
         .map_err(|e| CliError::NotFound(format!("metadata: {e}")))?;
     let meta: serde_json::Value = serde_json::from_str(&meta_txt)
@@ -416,12 +425,13 @@ fn graph_authorize(args: &[String]) -> Result<(), CliError> {
         .and_then(|v| v.as_str())
         .unwrap_or("unknown")
         .to_string();
+    crate::authority::verify_human_grant(&mission_id, &capability, &reason, &grant_sig)?;
     let now = chrono_now_iso();
     let mut g = load_graph(&mission)?;
 
     let ep_id = format!("ep_auth_{}", crate::ulid_like());
     let content = format!(
-        "{{\"capability\":\"{capability}\",\"reason\":{}}}",
+        "{{\"capability\":\"{capability}\",\"reason\":{},\"grant\":\"human\"}}",
         serde_json::to_string(&reason).unwrap()
     );
     let digest = sha256_hex(&content);
@@ -434,7 +444,7 @@ fn graph_authorize(args: &[String]) -> Result<(), CliError> {
         content_digest: Some(digest.clone()),
         valid_at: now.clone(),
         created_at: now.clone(),
-        actor_id: Some("spiffe://local.aevum/agent/graph-cli".into()),
+        actor_id: Some("spiffe://local.aevum/human/operator".into()),
     })
     .map_err(|e| CliError::Verify(format!("episode: {e}")))?;
 

@@ -10,7 +10,11 @@ fn main() -> ExitCode {
         "version": "v0",
         "aevum_passed": passed,
         "aevum_total": total,
-        "verdict": if passed == total { "AEVUM_MEMORY_PERFECT" } else { "AEVUM_MEMORY_FAIL" },
+        "verdict": if passed == total {
+            "AEVUM_MEMORY_SELF_RUN_PASS"
+        } else {
+            "AEVUM_MEMORY_FAIL"
+        },
         "offline": true,
         "cases": results,
     });

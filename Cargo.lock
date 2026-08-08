@@ -181,6 +181,7 @@ dependencies = [
  "aevum-ledger",
  "aevum-memory-fabric",
  "aevum-sentinel-kernel",
+ "chrono",
  "hex",
  "serde",
  "serde_json",
