@@ -6,7 +6,7 @@
 
 | ID | Claim | Status | Evidence |
 | --- | --- | --- | --- |
-| L-01 | rust-version="1.82" is declared in Cargo.toml | EVIDENCED | Cargo.toml rust-version="1.82" line (`head -30 Cargo.toml`) |
+| L-01 | rust-version MSRV declared in Cargo.toml | EVIDENCED | 2026-08-08: bumped to `rust-version="1.85"`; CI toolchain 1.85.0 (edition2024 deps) |
 | L-02 | cargo fmt --all -- --check passes on every crate | EVIDENCED | EXIT=0; .project/verification/M0/cargo-fmt.log shows explicit rustfmt --edition 2021 --check invocation over all 6 lib.rs |
 | L-03 | cargo clippy -D warnings passes for the workspace | EVIDENCED | EXIT=0; .project/verification/M0/cargo-clippy.log ends with 'Finished dev profile' and zero warnings under -D warnings |
 | L-04 | cargo test --workspace --all-features exits 0 | EVIDENCED | EXIT=0; .project/verification/M0/cargo-test.log shows 'test result: ok' for every crate; 12 'test result' line(s) present. Honest note: zero Rust unit tests today — this gate certifies the build & test harness only. Adding tests is the next loop. |

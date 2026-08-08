@@ -12,14 +12,16 @@
 - Clock via `chrono::Utc`; critical writes via tempfile + fsync + rename.
 - `doctor` hard-fails on corrupt/unsigned ledgers.
 
-### Quality
+### Quality / CI
 
 - CLI modules: `ledger_io`, `package`, `mission_ops`, `hooks`; `graph_cmd/{io,gate,mod}`.
 - Append/verify via `TrustLedger`; exec metachar via sentinel shared policy.
 - Golden/parallel emit `package_signature` (+ informational content sha).
 - `verify-package` binds trust key ↔ `authority_public_key` and verifies embedded ledger.
 - `verify`/`doctor` fail-closed on ledger/audit byte divergence.
-- L-38: `deny.toml` + `cargo deny check` in `scripts/prepub-verify.sh`.
+- MSRV **1.85** (CI toolchain 1.85.0) — unlocks edition-2024 transitive crates.
+- L-38: `deny.toml` + `cargo deny` in prepub **and** CI.
+- `scripts/refalsify-p0.sh` + CI step; report `docs/REFALSIFY_P0_2026-08-08.md`.
 
 ### Doctrine
 

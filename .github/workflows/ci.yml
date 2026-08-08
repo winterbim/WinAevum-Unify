@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.82.0
+          toolchain: 1.85.0
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Format check
@@ -22,10 +22,16 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
       - name: AgentTrustBench
         run: cargo run -p aevum-agent-trust-bench --quiet
       - name: MemoryTruthBench
         run: cargo run -p aevum-memory-truth-bench --quiet
+      - name: P0 refalsify
+        run: bash scripts/refalsify-p0.sh
       - name: Hub scorecard
         run: python3 scripts/benchmark-hub-scorecard.py
 
@@ -36,7 +42,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.82.0
+          toolchain: 1.85.0
       - uses: Swatinem/rust-cache@v2
       - uses: pnpm/action-setup@v4
         with:

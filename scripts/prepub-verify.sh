@@ -16,6 +16,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 echo "==> cargo test"
 cargo test --workspace --quiet
 
+echo "==> P0 refalsify"
+bash scripts/refalsify-p0.sh
+
 echo "==> AgentTrustBench"
 out="$(cargo run -p aevum-agent-trust-bench --quiet 2>&1)"
 echo "$out" | tail -3

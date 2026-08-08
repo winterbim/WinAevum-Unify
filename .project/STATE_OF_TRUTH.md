@@ -37,7 +37,7 @@
 
 ## Residual gaps (honest)
 
-- Independent 20-agent adversarial re-audit in a **fresh clone/session** not yet run (publication gate).
+- Automated P0 refalsify is CI-gated (`scripts/refalsify-p0.sh`); a multi-agent human panel on a fresh clone is still recommended before a marketing tag.
 - Human key must stay outside the agent sandbox (operator responsibility).
 - Live GitHub PR merge with `aevum-gate` against remote not dogfooded end-to-end.
 - Managed multi-tenant cloud is not the focus.
