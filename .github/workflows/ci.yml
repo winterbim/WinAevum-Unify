@@ -26,6 +26,8 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
+          # Default graph only — `remote-embed` (ureq/rustls) is opt-in, not CI default.
+          arguments: ""
       - name: AgentTrustBench
         run: cargo run -p aevum-agent-trust-bench --quiet
       - name: MemoryTruthBench
