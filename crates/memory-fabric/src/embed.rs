@@ -1,13 +1,12 @@
 //! Embedding port — semantic hybrid search without making gates depend on LLM vendors.
 //!
-//! - [`HashingEmbedder`]: deterministic local vectors (always available, offline).
-//! - [`OpenAiCompatibleEmbedder`]: real HTTP to OpenAI-compatible `/v1/embeddings`
-//!   when `EMBEDDING_URL` + `EMBEDDING_API_KEY` (or `OPENAI_API_KEY`) are set.
+//! - [`HashingEmbedder`]: deterministic local vectors (always available, offline) — **default**.
+//! - [`OpenAiCompatibleEmbedder`]: only with cargo feature `remote-embed` **and**
+//!   `AEVUM_ALLOW_REMOTE_EMBED=1` plus API credentials (ADR-0018: not linked by default).
 //!
 //! Gates never require embeddings. They improve recall only.
 
 use aevum_evidence_graph::{hybrid_search, SearchHit, SearchRecipe, TemporalGraph};
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -102,7 +101,8 @@ impl Embedder for HashingEmbedder {
     }
 }
 
-/// OpenAI-compatible embeddings HTTP client (real requests — no stubs).
+/// OpenAI-compatible embeddings HTTP client — only built with `remote-embed`.
+#[cfg(feature = "remote-embed")]
 pub struct OpenAiCompatibleEmbedder {
     url: String,
     api_key: String,
@@ -111,8 +111,15 @@ pub struct OpenAiCompatibleEmbedder {
     agent: ureq::Agent,
 }
 
+#[cfg(feature = "remote-embed")]
 impl OpenAiCompatibleEmbedder {
     pub fn from_env() -> Result<Self, EmbedError> {
+        let allow = std::env::var("AEVUM_ALLOW_REMOTE_EMBED").unwrap_or_default();
+        if allow != "1" {
+            return Err(EmbedError::NotConfigured(
+                "set AEVUM_ALLOW_REMOTE_EMBED=1 to enable remote embeddings (ADR-0018)".into(),
+            ));
+        }
         let url = std::env::var("EMBEDDING_URL")
             .or_else(|_| {
                 std::env::var("OPENAI_BASE_URL")
@@ -141,6 +148,7 @@ impl OpenAiCompatibleEmbedder {
     }
 }
 
+#[cfg(feature = "remote-embed")]
 impl Embedder for OpenAiCompatibleEmbedder {
     fn name(&self) -> &'static str {
         "openai-compatible"
@@ -151,6 +159,7 @@ impl Embedder for OpenAiCompatibleEmbedder {
     }
 
     fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbedError> {
+        use serde::Deserialize;
         #[derive(Deserialize)]
         struct Resp {
             data: Vec<Item>,
@@ -184,12 +193,15 @@ impl Embedder for OpenAiCompatibleEmbedder {
     }
 }
 
-/// Prefer OpenAI-compatible when configured; else hashing (always works offline).
+/// Default embedder is always local hashing. Remote HTTP is never automatic.
 pub fn default_embedder() -> Box<dyn Embedder> {
-    match OpenAiCompatibleEmbedder::from_env() {
-        Ok(e) => Box::new(e),
-        Err(_) => Box::new(HashingEmbedder::default()),
+    #[cfg(feature = "remote-embed")]
+    {
+        if let Ok(e) = OpenAiCompatibleEmbedder::from_env() {
+            return Box::new(e);
+        }
     }
+    Box::new(HashingEmbedder::default())
 }
 
 /// Embed query + attach vectors onto graph nodes missing embeddings (in-place).

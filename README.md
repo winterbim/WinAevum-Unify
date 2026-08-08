@@ -9,7 +9,7 @@ WinAevum-Unify unifies:
 3. **Universal hub** — MCP + Claude plugin + PreToolUse bridge + IDE adapters (ADR-0021)
 
 No memory vendor. No LLM-as-authority. Golden Path never auto-merges (`auto_merge: false`).
-PreToolUse + CLI + MCP are fail-closed when a mission is bound (P0-4). Embedding HTTP (`ureq`) may still be present — treat remote embed as opt-in via env, not “offline by default” until ADR-0018 is re-evidenced.
+PreToolUse + CLI + MCP are fail-closed when a mission is bound (P0-4). Offline by default: remote embeddings require cargo feature `remote-embed` **and** `AEVUM_ALLOW_REMOTE_EMBED=1` (ADR-0018).
 
 **Repo:** https://github.com/winterbim/WinAevum-Unify  
 **Why this hub:** [docs/HUB_ADAPTERS.md](docs/HUB_ADAPTERS.md)

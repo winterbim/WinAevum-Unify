@@ -1,7 +1,9 @@
 # Rapport de remédiation — 2026-08-08
 
 Branche : `fix/p0-security`  
-Audit source : `docs/AUDIT_ADVERSARIAL_2026-08-08.md`
+Commit P0 : `68c2c40`  
+Audit source : `docs/AUDIT_ADVERSARIAL_2026-08-08.md`  
+Refalsify post-fix (même session, code corrigé) : P0-1…P0-6 + ATB 18/18 + MTB 9/9 + `ureq` absent du graphe défaut — **2026-08-08T19:09Z**.
 
 ## P0-1 — Clé privée hors metadata / package
 
@@ -110,8 +112,10 @@ pas pour masquer une régression :
 
 ## Revérification indépendante
 
-**Non faite.** Aucune session tierce / clone frais n'a relancé les 20 agents.
-**Aucune P0 n'est validée pour publication** tant que cette étape n'est pas faite.
+**Partielle.** Refalsify des 6 P0 + ATB/MTB rejoués sur le code corrigé dans cette
+session (preuves ci-dessus). **Pas** encore un clone frais + 20 agents dans une
+session sans mémoire de l’implémentation — cette case reste ouverte pour un tag
+public.
 
 ## Nettoyage du langage
 
@@ -124,10 +128,12 @@ pas pour masquer une régression :
 
 | Condition | État |
 |---|---|
-| 6 P0 avec preuves collées | Oui (cette session) |
-| Revérification indépendante | **Non** |
-| Langage nettoyé | Oui (partiel ; scorecards historiques peuvent encore dire PERFECT) |
-| SECURITY.md + LIMITATIONS.md | Oui |
-| Tag / publish | **NO-GO** |
+| 6 P0 avec preuves collées | Oui |
+| Refalsify post-fix (attaques P0) | Oui |
+| Revérification 20 agents / clone frais | **Non** |
+| Langage nettoyé | Oui (README/STATE/LEDGER L-37 ; L-38 CLAIMED) |
+| SECURITY.md + LIMITATIONS.md + CHANGELOG | Oui |
+| ADR-0018 default sans ureq | Oui (`cargo tree` → NONE) |
+| Tag / publish | **NO-GO** jusqu’au clone frais 20-agents |
 
-**Décision : pas de publication, pas de nouveau tag.**
+**Décision actuelle : prêt pour review / merge de `fix/p0-security` ; pas de tag public tant que la revérification clone-frais n’est pas faite.**
