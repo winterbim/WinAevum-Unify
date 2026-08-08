@@ -16,16 +16,19 @@ cargo clippy --workspace --all-targets -- -D warnings
 echo "==> cargo test"
 cargo test --workspace --quiet
 
+echo "==> P0 refalsify"
+bash scripts/refalsify-p0.sh
+
 echo "==> AgentTrustBench"
 out="$(cargo run -p aevum-agent-trust-bench --quiet 2>&1)"
 echo "$out" | tail -3
-echo "$out" | grep -q '"verdict": "AEVUM_PERFECT"' || die "ATB verdict"
+echo "$out" | grep -Eq '"verdict": "AEVUM_(SELF_RUN_PASS|PERFECT)"' || die "ATB verdict"
 echo "$out" | grep -q 'AgentTrustBench: 18/18' || die "ATB 18/18"
 
 echo "==> MemoryTruthBench"
 out="$(cargo run -p aevum-memory-truth-bench --quiet 2>&1)"
 echo "$out" | tail -3
-echo "$out" | grep -q '"verdict": "AEVUM_MEMORY_PERFECT"' || die "MTB verdict"
+echo "$out" | grep -Eq '"verdict": "AEVUM_MEMORY_(SELF_RUN_PASS|PERFECT)"' || die "MTB verdict"
 echo "$out" | grep -q 'MemoryTruthBench: 9/9' || die "MTB 9/9"
 
 echo "==> dogfood"
@@ -40,8 +43,10 @@ pnpm -r lint
 pnpm -r build
 pnpm -r test
 
-echo "==> licenses"
+echo "==> licenses (files + cargo-deny)"
 test -f LICENSE && test -f LICENSE-MIT && test -f LICENSE-APACHE
+command -v cargo-deny >/dev/null || die "cargo-deny not installed (cargo install cargo-deny)"
+cargo deny check
 
 echo "==> no competitor memory-vendor names"
 # Pattern is intentional; exclude this script so the checker is not a self-hit.

@@ -8,7 +8,8 @@ WinAevum-Unify unifies:
 2. **Deterministic AI-slop firewall** — [slopcheck](https://github.com/winterbim/slopcheck) findings bind as **Inference only** (never authorize)
 3. **Universal hub** — MCP + Claude plugin + PreToolUse bridge + IDE adapters (ADR-0021)
 
-No memory vendor. No LLM-as-authority. No `bypassPermissions`. Offline by default. Golden Path never auto-merges.
+No memory vendor. No LLM-as-authority. Golden Path never auto-merges (`auto_merge: false`).
+PreToolUse + CLI + MCP are fail-closed when a mission is bound (P0-4). Offline by default: remote embeddings require cargo feature `remote-embed` **and** `AEVUM_ALLOW_REMOTE_EMBED=1` (ADR-0018).
 
 **Repo:** https://github.com/winterbim/WinAevum-Unify  
 **Why this hub:** [docs/HUB_ADAPTERS.md](docs/HUB_ADAPTERS.md)
@@ -20,7 +21,7 @@ No memory vendor. No LLM-as-authority. No `bypassPermissions`. Offline by defaul
 | Rust trust path | identity, attestation, ledger, sentinel, TemporalGraph, memory-fabric, `unify` CLI |
 | Anti-slop + rules | `unify slop`, `unify rules scan` → Inference episodes |
 | Parallel | `unify parallel` — attested best-of-N (no auto-merge) |
-| Proof | AgentTrustBench **18/18**, MemoryTruthBench **9/9**, hub scorecard |
+| Self-run benches | AgentTrustBench **18/18** (`AEVUM_SELF_RUN_PASS`), MemoryTruthBench **9/9** — auto-evaluated in this repo, not third-party verified |
 | MCP | package / verify / golden / falsify / slop / rules / pretool / doctor / agent_card |
 | Plugin | [`plugins/aevum-unify`](plugins/aevum-unify) for Claude Code |
 | Dream | `unify doctor` + `unify dream` — loud denies, AGENT_CARD ([docs/AGENT_DREAM.md](docs/AGENT_DREAM.md)) |
@@ -33,8 +34,8 @@ License: **MIT OR Apache-2.0**.
 ```bash
 pnpm install --frozen-lockfile && pnpm -r test
 cargo test --workspace
-cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 18/18
-cargo run -p aevum-memory-truth-bench   # AEVUM_MEMORY_PERFECT 9/9
+cargo run -p aevum-agent-trust-bench    # self-run 18/18 (AEVUM_SELF_RUN_PASS)
+cargo run -p aevum-memory-truth-bench   # self-run 9/9 (not third-party)
 python3 scripts/benchmark-hub-scorecard.py
 bash scripts/aevum-on-aevum.sh
 bash scripts/dual-dogfood.sh

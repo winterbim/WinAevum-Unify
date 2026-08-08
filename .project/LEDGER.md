@@ -6,7 +6,7 @@
 
 | ID | Claim | Status | Evidence |
 | --- | --- | --- | --- |
-| L-01 | rust-version="1.82" is declared in Cargo.toml | EVIDENCED | Cargo.toml rust-version="1.82" line (`head -30 Cargo.toml`) |
+| L-01 | rust-version MSRV declared in Cargo.toml | EVIDENCED | 2026-08-08: bumped to `rust-version="1.85"`; CI toolchain 1.85.0 (edition2024 deps) |
 | L-02 | cargo fmt --all -- --check passes on every crate | EVIDENCED | EXIT=0; .project/verification/M0/cargo-fmt.log shows explicit rustfmt --edition 2021 --check invocation over all 6 lib.rs |
 | L-03 | cargo clippy -D warnings passes for the workspace | EVIDENCED | EXIT=0; .project/verification/M0/cargo-clippy.log ends with 'Finished dev profile' and zero warnings under -D warnings |
 | L-04 | cargo test --workspace --all-features exits 0 | EVIDENCED | EXIT=0; .project/verification/M0/cargo-test.log shows 'test result: ok' for every crate; 12 'test result' line(s) present. Honest note: zero Rust unit tests today — this gate certifies the build & test harness only. Adding tests is the next loop. |
@@ -44,8 +44,8 @@
 | L-34 | P1 SQLite + embeddings + Golden Path + falsifier + Mission Control graph (ADR-0015) | EVIDENCED | SqliteBackend default + JSON twin; HashingEmbedder + semantic_hybrid_search; unify golden/falsify/approve; Mission Control GraphView; AgentTrustBench 15/15 AEVUM_PERFECT; clippy -D warnings clean; aevum-on-aevum PASS |
 | L-35 | P2 Native Superior Memory (ADR-0016): BM25+FTS5, contradictions, deterministic ingest, MemoryTruthBench | EVIDENCED | query.rs Okapi BM25+trust fusion; sqlite facts_fts; unify graph ingest/contradictions; MemoryTruthBench offline; CI MemoryTruthBench job |
 | L-36 | P3 RRF+local CE; MTB 7/7 (ADR-0017) | EVIDENCED | hybrid_search RRF+local_cross_encoder; MTB-06/07; Aevum-only memory scorecard |
-| L-37 | Native-only memory fabric — purge third-party memory vendor surface (ADR-0018) | EVIDENCED | Remote HTTP memory backend removed; open_backend sqlite\|json only; aevum_memory_ingest_remote; MTB/ATB green; zero competitor names in tree |
-| L-38 | Pre-publication gate: licenses + README/STATE_OF_TRUTH + full verify script | EVIDENCED | LICENSE(+MIT/APACHE); README Trusted Autonomy; STATE_OF_TRUTH 2026-08-07; scripts/prepub-verify.sh; cargo fmt/clippy/test + ATB 15/15 + MTB 7/7 + dogfood PASS + pnpm lint/build/test 40+1 + ledger 35 EVIDENCED |
+| L-37 | Native-only memory fabric — purge third-party memory vendor surface (ADR-0018) | EVIDENCED | 2026-08-08 re-proof: `ureq` optional behind `remote-embed` (default off); `cargo tree -p aevum-memory-fabric` has zero ureq/rustls; `default_embedder` = HashingEmbedder unless feature+`AEVUM_ALLOW_REMOTE_EMBED=1` |
+| L-38 | Pre-publication gate: licenses + README/STATE_OF_TRUTH + full verify script | EVIDENCED | 2026-08-08: `deny.toml` + `cargo deny check` (advisories/bans/licenses/sources ok); `scripts/prepub-verify.sh` runs cargo-deny after LICENSE file checks |
 | L-39 | Native multi-tenant scale (ADR-0019): TenantScope + MultiTenantStore + WAL + MTB-08/09 | EVIDENCED | scope.rs + multitenant.rs; FTS mission_id; unify graph tenants; MTB 9/9; scale_managed=8 on scorecard |
 | L-40 | Unprecedented: Trusted Autonomy ∩ slopcheck firewall (ADR-0020) | EVIDENCED | unify slop; ingest_slop_report Inference-only; golden --slop-gate; MCP aevum_slop_scan; ATB-16; ATB 16/16; scripts/dual-dogfood.sh |
 | L-41 | Projet Phare: Trusted Autonomy Hub (ADR-0021) | EVIDENCED | package ledger+audit+slop digests; MCP package/golden/falsify/rules/pretool; plugins/aevum-unify; unify parallel; HUB_ADAPTERS; ATB 17/17; hub scorecard; aevum-agent-loop |

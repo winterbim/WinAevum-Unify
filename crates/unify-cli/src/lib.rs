@@ -5,9 +5,15 @@
 //! without paying the cost of spawning a process. The binary in `main.rs`
 //! only parses argv and dispatches to one of these functions.
 
+pub mod atomic;
+pub mod authority;
 pub mod dream;
 pub mod golden;
 pub mod graph_cmd;
+pub mod hooks;
+pub mod ledger_io;
+pub mod mission_ops;
+pub mod package;
 pub mod parallel;
 pub mod rules;
 pub mod slop;
@@ -22,6 +28,10 @@ pub use aevum_attestation::{
     ActionAttestation as RustAttestation, AttestationSigner, RiskClass as RustRiskClass,
 };
 pub use aevum_identity::{Identity, KeyMaterial};
+pub use hooks::cmd_pretool_check;
+pub use ledger_io::verify_signed_ledger_text;
+pub use mission_ops::{cmd_exec, cmd_run, cmd_verify};
+pub use package::{cmd_package, cmd_verify_package};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Mission {
@@ -37,12 +47,7 @@ pub struct MissionMetadata {
     pub mission: Mission,
     pub policy_bundle_digest: String,
     pub authority_public_key: String,
-    /// Hex-encoded Ed25519 secret key. Local-first MVP: this is the
-    /// reproducible trust anchor that lets the holder of the mission
-    /// directory run `unify run` and sign with the same authority. In a
-    /// production deployment (M11+) this would be replaced by a hardware
-    /// key or a remote KMS reference — the field becomes a `kms_ref`.
-    pub authority_secret_key_hex: String,
+    /// Authority secret is NEVER stored here (P0-1). See `{mission}/.aevum/authority.sk`.
     pub kernel_manifest_digest: String,
 }
 
@@ -74,9 +79,15 @@ pub fn print_help() {
     println!("  unify run            --mission <dir> --capability <name> --argv <str>");
     println!("  unify verify         <dir>");
     println!("  unify package        --mission <dir> --out <file.json>");
-    println!("  unify verify-package <file.json>");
+    println!("  unify verify-package <file.json> [--trust-pubkey <hex-file>]");
     println!("  unify exec         --mission <dir> --capability <name> --argv <token> [--argv <token>...]");
     println!("  unify graph        <status|search|as-of|authorize|add-episode> ...");
+    println!("  unify human-keygen [--out <path>]   # distinct human principal (P0-5)");
+    println!("  unify human-grant  --mission-id <id> --capability <name> [--reason …]");
+    println!(
+        "  unify pretool-check --capability <name> [--mission <dir>] [--tool …] [--command …]"
+    );
+    println!("  unify debug-now    # print UTC clock (P0-6)");
     println!("  unify context      --mission <dir> --query <text> [--capability <cap>]");
     println!("  unify falsify      --mission <dir> --reason <text>   # required for R3+");
     println!("  unify approve      --mission <dir> [--decision approved]");
@@ -130,6 +141,7 @@ pub fn cmd_new(args: &[String]) -> Result<(), CliError> {
     fs::write(&policy_path, &policy_default)
         .map_err(|e| CliError::Io(format!("writing policy: {e}")))?;
     let authority = Identity::ephemeral("ledger-authority");
+    authority::write_authority_keys(&out_dir, &authority.key)?;
     let meta = MissionMetadata {
         mission: Mission {
             mission_id: mission_id.clone(),
@@ -140,12 +152,12 @@ pub fn cmd_new(args: &[String]) -> Result<(), CliError> {
         },
         policy_bundle_digest: policy_digest,
         authority_public_key: hex::encode(authority.key.public_bytes()),
-        authority_secret_key_hex: hex::encode(authority.key.secret_bytes()),
         kernel_manifest_digest: "sha256:kernel:default/v1".into(),
     };
     let meta_path = Path::new(&out_dir).join("metadata.json");
-    fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
-        .map_err(|e| CliError::Io(format!("writing metadata: {e}")))?;
+    let meta_text = serde_json::to_string_pretty(&meta).unwrap();
+    atomic::atomic_write(&meta_path, meta_text.as_bytes()).map_err(CliError::Io)?;
+    atomic::set_mode_600(&meta_path).map_err(CliError::Io)?;
     // Temporal trust graph seeded from constitution (ADR-0013) + SQLite twin (P1).
     graph_cmd::seed_and_persist(
         &out_dir,
@@ -168,477 +180,24 @@ pub fn cmd_new(args: &[String]) -> Result<(), CliError> {
     Ok(())
 }
 
-pub fn cmd_run(args: &[String]) -> Result<(), CliError> {
-    let mission_dir = require_value(args, "--mission")?;
-    let capability = require_value(args, "--capability")?;
-    let argv_str = require_value(args, "--argv")?;
-    graph_cmd::require_authorized(&mission_dir, &capability)?;
-    let meta = load_metadata(&mission_dir)?;
-    if let Some(rc) = aevum_autonomy_governor::RiskClass::from_label(&meta.mission.risk) {
-        graph_cmd::require_falsifier_if_needed(&mission_dir, rc)?;
-    }
-    let authority_key = KeyMaterial::from_secret_hex(&meta.authority_secret_key_hex)
-        .map_err(|e| CliError::Verify(format!("authority secret key parse: {e}")))?;
-    let actor = Identity {
-        spiffe_id: "spiffe://local.aevum/agent/run-cli".to_string(),
-        key: authority_key,
-        audience: "aevum".to_string(),
-    };
-    let signer = AttestationSigner::new(actor.clone());
-    let attestation = RustAttestation {
-        schema_version: "aevum.action-attestation/v1".into(),
-        attestation_id: format!("aat_{}", ulid_like()),
-        action_id: format!("act_{}", ulid_like()),
-        mission_id: meta.mission.mission_id.clone(),
-        constitution_version: 1,
-        constitution_digest: meta.mission.constitution_digest.clone(),
-        policy_bundle_digest: meta.policy_bundle_digest.clone(),
-        principal_id: actor.spiffe_id.clone(),
-        agent_definition: "unify-cli@0.1".into(),
-        council_role: "producer".into(),
-        capability: capability.clone(),
-        resource: argv_str.clone(),
-        parameters_digest: sha256_hex(&argv_str),
-        expected_effects: vec![format!("{capability} executed")],
-        forbidden_effects: vec!["main modified".into()],
-        evidence_required: vec!["repo_state".into()],
-        evidence_attached: vec![],
-        evidence_completeness: 0.6,
-        risk_class: risk_class_from_label(&meta.mission.risk),
-        risk_score: 25,
-        reversible: true,
-        blast_radius: "single_repository".into(),
-        approval_ids: vec![],
-        not_before: "2026-08-02T00:00:00+00:00".into(),
-        expires_at: "2099-01-01T00:00:00+00:00".into(),
-        max_uses: 1,
-        recovery_strategy: "delete_branch".into(),
-        recovery_verified: true,
-        nonce: ulid_like(),
-        signature: None,
-    };
-    let signed = signer
-        .sign(attestation)
-        .map_err(|e| CliError::Verify(format!("signing: {e}")))?;
-    signer
-        .verify(&signed)
-        .map_err(|e| CliError::Verify(format!("verify failed: {e}")))?;
-    let sig_value = signed
-        .signature
-        .as_ref()
-        .and_then(|s| s.strip_prefix("ed25519:"))
-        .unwrap_or("");
-    append_audit_trail(
-        &mission_dir,
-        &actor.spiffe_id,
-        &capability,
-        &argv_str,
-        &signed.attestation_id,
-    )?;
-    println!(
-        "✓ signed and verified {capability} (attestation_id={})",
-        signed.attestation_id
-    );
-    println!(
-        "  signature (first 8 hex): ed25519:{}",
-        &sig_value[..8.min(sig_value.len())]
-    );
+pub(crate) fn chrono_now_iso() -> String {
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+}
+
+pub fn cmd_debug_now(_args: &[String]) -> Result<(), CliError> {
+    println!("{}", chrono_now_iso());
     Ok(())
 }
 
-fn append_audit_trail(
-    mission_dir: &str,
-    actor: &str,
-    capability: &str,
-    argv: &str,
-    attestation_id: &str,
-) -> Result<(), CliError> {
-    let trail = Path::new(mission_dir).join("audit_trail.jsonl");
-    let prev_digest = previous_digest(&trail);
-    let sequence = next_sequence(&trail);
-    let record = serde_json::json!({
-        "ts": chrono_now_iso(),
-        "sequence": sequence,
-        "actor": actor,
-        "capability": capability,
-        "argv": argv,
-        "attestation_id": attestation_id,
-        "prev_digest": prev_digest,
-    });
-    let line = serde_json::to_string(&record).unwrap();
-    let mut text = fs::read_to_string(&trail).unwrap_or_default();
-    text.push_str(&line);
-    text.push('\n');
-    fs::write(&trail, &text).map_err(|e| CliError::Io(format!("writing audit trail: {e}")))?;
-    // Keep trust ledger twin in sync — evidence packages must not ship empty ledgers
-    // after real effects (ADR-0021 / Projet Phare).
-    let ledger = Path::new(mission_dir).join("ledger.jsonl");
-    let mut ledger_text = fs::read_to_string(&ledger).unwrap_or_default();
-    ledger_text.push_str(&line);
-    ledger_text.push('\n');
-    fs::write(&ledger, ledger_text).map_err(|e| CliError::Io(format!("writing ledger: {e}")))?;
-    Ok(())
-}
-
-fn previous_digest(trail: &Path) -> String {
-    let raw = fs::read_to_string(trail).unwrap_or_default();
-    let last = raw.lines().rfind(|l| !l.trim().is_empty());
-    match last {
-        Some(line) => {
-            let v: serde_json::Value = serde_json::from_str(line).unwrap_or_default();
-            let cap = v.get("capability").and_then(|s| s.as_str()).unwrap_or("?");
-            let argv = v.get("argv").and_then(|s| s.as_str()).unwrap_or("");
-            sha256_hex(&format!("{cap}|{argv}"))
-        }
-        None => "sha256:genesis".into(),
-    }
-}
-
-fn next_sequence(trail: &Path) -> u64 {
-    let raw = fs::read_to_string(trail).unwrap_or_default();
-    raw.lines()
-        .filter(|l| !l.trim().is_empty())
-        .filter_map(|l| {
-            let v: serde_json::Value = serde_json::from_str(l).ok()?;
-            v.get("sequence")?.as_u64()
-        })
-        .max()
-        .map(|n| n + 1)
-        .unwrap_or(1)
-}
-
-pub fn cmd_verify(args: &[String]) -> Result<(), CliError> {
-    let target = args
-        .first()
-        .ok_or_else(|| CliError::Missing("<dir>".into()))?;
-    if !Path::new(target).is_dir() {
-        return Err(CliError::NotFound(target.clone()));
-    }
-    let meta = load_metadata(target)?;
-    let trail = Path::new(target).join("audit_trail.jsonl");
-    let raw = if trail.exists() {
-        fs::read_to_string(&trail).unwrap_or_default()
-    } else {
-        String::new()
-    };
-    let entry_count = raw.lines().filter(|l| !l.trim().is_empty()).count();
-    let (chain_ok, summary) = walk_chain(&trail);
-    println!("✓ trust ledger verified — {entry_count} entries on disk");
-    println!("  mission: {}", meta.mission.mission_id);
-    println!("  risk:    {}", meta.mission.risk);
-    println!(
-        "  policy:  {}",
-        &meta.policy_bundle_digest[..33.min(meta.policy_bundle_digest.len())]
-    );
-    if chain_ok {
-        println!("  chain:   {} (all links verified)", summary);
-    } else {
-        println!("  chain:   BROKEN — {summary}");
-    }
-    if !chain_ok {
-        return Err(CliError::Verify(format!("ledger chain broken: {summary}")));
-    }
-    Ok(())
-}
-
-fn walk_chain(trail: &Path) -> (bool, String) {
-    let raw = fs::read_to_string(trail).unwrap_or_default();
-    let entries: Vec<&str> = raw.lines().filter(|l| !l.trim().is_empty()).collect();
-    if entries.is_empty() {
-        return (true, "empty ledger".into());
-    }
-    let mut last_digest = "sha256:genesis".to_string();
-    let mut prev_seq: u64 = 0;
-    for (i, line) in entries.iter().enumerate() {
-        let v: serde_json::Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(e) => return (false, format!("entry {i} not json: {e}")),
-        };
-        let seq = v.get("sequence").and_then(|n| n.as_u64()).unwrap_or(0);
-        if seq != prev_seq + 1 {
-            return (
-                false,
-                format!("expected sequence {} got {}", prev_seq + 1, seq),
-            );
-        }
-        let pd = v.get("prev_digest").and_then(|s| s.as_str()).unwrap_or("");
-        if pd != last_digest {
-            return (false, format!("seq {seq}: prev_digest mismatch"));
-        }
-        let cap = v.get("capability").and_then(|s| s.as_str()).unwrap_or("");
-        let argv = v.get("argv").and_then(|s| s.as_str()).unwrap_or("");
-        last_digest = sha256_hex(&format!("{cap}|{argv}"));
-        prev_seq = seq;
-    }
-    (true, format!("{} entries linked", entries.len()))
-}
-
-pub fn cmd_package(args: &[String]) -> Result<(), CliError> {
-    let mission = require_value(args, "--mission")?;
-    let out = require_value(args, "--out")?;
-    let meta = load_metadata(&mission)?;
-    let ledger_path = Path::new(&mission).join("ledger.jsonl");
-    let audit_path = Path::new(&mission).join("audit_trail.jsonl");
-    let slop_path = Path::new(&mission).join("slop-report.json");
-
-    let audit_raw = if audit_path.exists() {
-        fs::read_to_string(&audit_path).unwrap_or_default()
-    } else {
-        String::new()
-    };
-    let mut ledger_entries = if ledger_path.exists() {
-        fs::read_to_string(&ledger_path).unwrap_or_default()
-    } else {
-        String::new()
-    };
-
-    // Fail-closed heal: effects recorded in audit must appear in the trust ledger.
-    if ledger_entries.trim().is_empty() && !audit_raw.trim().is_empty() {
-        fs::write(&ledger_path, &audit_raw)
-            .map_err(|e| CliError::Io(format!("sync ledger from audit: {e}")))?;
-        ledger_entries = audit_raw.clone();
-    }
-    if !audit_raw.trim().is_empty() && ledger_entries.trim().is_empty() {
-        return Err(CliError::Verify(
-            "refuse to package: audit_trail has effects but ledger is empty after sync".into(),
-        ));
-    }
-
-    let audit_digest = if audit_raw.trim().is_empty() {
-        "sha256:none".into()
-    } else {
-        sha256_hex(&audit_raw)
-    };
-    let slop_digest = if slop_path.exists() {
-        let s = fs::read_to_string(&slop_path).unwrap_or_default();
-        sha256_hex(&s)
-    } else {
-        "sha256:none".into()
-    };
-
-    // Build the package as a serde_json::Map with explicit insertion order —
-    // the verify-package subcommand re-derives the digest by removing the
-    // `package_digest` line, so the textual pre-digest representation must
-    // match exactly.
-    let mut pkg = serde_json::Map::new();
-    pkg.insert(
-        "package_version".into(),
-        serde_json::Value::String("aevum.evidence-package/v1".into()),
-    );
-    pkg.insert(
-        "mission".into(),
-        serde_json::to_value(&meta.mission).unwrap(),
-    );
-    pkg.insert(
-        "policy_bundle_digest".into(),
-        serde_json::Value::String(meta.policy_bundle_digest.clone()),
-    );
-    pkg.insert(
-        "authority_public_key".into(),
-        serde_json::Value::String(meta.authority_public_key.clone()),
-    );
-    pkg.insert(
-        "kernel_manifest_digest".into(),
-        serde_json::Value::String(meta.kernel_manifest_digest.clone()),
-    );
-    pkg.insert(
-        "ledger_entries".into(),
-        serde_json::Value::String(ledger_entries.clone()),
-    );
-    pkg.insert(
-        "audit_trail_digest".into(),
-        serde_json::Value::String(audit_digest),
-    );
-    pkg.insert(
-        "slop_report_digest".into(),
-        serde_json::Value::String(slop_digest),
-    );
-    let graph_digest = if graph_cmd::graph_path(&mission).exists() {
-        let graw = fs::read_to_string(graph_cmd::graph_path(&mission)).unwrap_or_default();
-        sha256_hex(&graw)
-    } else {
-        "sha256:none".into()
-    };
-    pkg.insert(
-        "temporal_graph_digest".into(),
-        serde_json::Value::String(graph_digest),
-    );
-    let placeholder = serde_json::Value::Object(pkg);
-    let text = serde_json::to_string_pretty(&placeholder).unwrap();
-    let digest = sha256_hex(&text);
-    let mut with_digest = placeholder.as_object().unwrap().clone();
-    with_digest.insert(
-        "package_digest".into(),
-        serde_json::Value::String(digest.clone()),
-    );
-    let final_value = serde_json::Value::Object(with_digest);
-    fs::write(&out, serde_json::to_string_pretty(&final_value).unwrap())
-        .map_err(|e| CliError::Io(format!("writing {out}: {e}")))?;
-    println!("✓ package written to {out} (digest={digest})");
-    Ok(())
-}
-
-pub fn cmd_exec(args: &[String]) -> Result<(), CliError> {
-    let mission_dir = require_value(args, "--mission")?;
-    let capability = require_value(args, "--capability")?;
-    let argv: Vec<String> = collect_all_argv(args);
-    if argv.is_empty() {
-        return Err(CliError::Missing("--argv".into()));
-    }
-    graph_cmd::require_authorized(&mission_dir, &capability)?;
-    let meta = load_metadata(&mission_dir)?;
-    if let Some(rc) = aevum_autonomy_governor::RiskClass::from_label(&meta.mission.risk) {
-        graph_cmd::require_falsifier_if_needed(&mission_dir, rc)?;
-    }
-    let authority_key = KeyMaterial::from_secret_hex(&meta.authority_secret_key_hex)
-        .map_err(|e| CliError::Verify(format!("authority secret key parse: {e}")))?;
-    let actor = Identity {
-        spiffe_id: "spiffe://local.aevum/agent/exec".into(),
-        key: authority_key,
-        audience: "aevum".into(),
-    };
-    // Sentinel: refuse shell metacharacters anywhere in argv. This is the
-    // M11 hook — we use a hard-coded allow-list here to keep the
-    // local-first MVP testable.
-    for arg in &argv {
-        if SHELL_METACHARS.iter().any(|c| arg.contains(*c)) {
-            return Err(CliError::Verify(format!(
-                "argv entry contains shell metachar: {arg:?}"
-            )));
-        }
-    }
-    // We refuse `sh -c` explicitly (D14).
-    if argv.len() >= 2 && argv[0] == "sh" && argv.iter().any(|a| a == "-c") {
-        return Err(CliError::Verify(
-            "command rejected: sh -c is denied (D14)".into(),
-        ));
-    }
-    let cmd = &argv[0];
-    let output = std::process::Command::new(cmd)
-        .args(&argv[1..])
-        .output()
-        .map_err(|e| CliError::Io(format!("spawn {cmd}: {e}")))?;
-    let exit_code = output.status.code().unwrap_or(-1);
-    let argv_for_log = argv.join(" ");
-    append_audit_trail(
-        &mission_dir,
-        &actor.spiffe_id,
-        &capability,
-        &argv_for_log,
-        "exec",
-    )?;
-    println!("✓ exec argv[0]={cmd} exit={exit_code} audit_record_id=exec");
-    if exit_code != 0 {
-        return Err(CliError::Verify(format!(
-            "exec exited with code {exit_code}"
-        )));
-    }
-    Ok(())
-}
-
-fn collect_all_argv(args: &[String]) -> Vec<String> {
-    let mut out = Vec::new();
+pub fn optional_value(args: &[String], key: &str) -> Option<String> {
     let mut i = 0;
     while i < args.len() {
-        if args[i] == "--argv" {
-            if let Some(v) = args.get(i + 1) {
-                out.push(v.clone());
-            }
-            i += 2;
-        } else {
-            i += 1;
+        if args[i] == key {
+            return args.get(i + 1).cloned();
         }
+        i += 1;
     }
-    out
-}
-
-const SHELL_METACHARS: &[&str] = &[";", "&", "|", "$", "`", ">", "<", "*", "?", "!", "\n", "\r"];
-
-pub(crate) fn chrono_now_iso() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let minutes = (now / 60) % 60;
-    let hours = (now / 3600) % 24;
-    let days = now / 86400;
-    let days_per_month = [31u64, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    let mut year = 1970u64;
-    let mut day_of_year = days;
-    loop {
-        let leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-        let yd = if leap { 366 } else { 365 };
-        if day_of_year < yd {
-            break;
-        }
-        day_of_year -= yd;
-        year += 1;
-    }
-    let mut month = 0;
-    let mut dom = day_of_year;
-    for (i, dm) in days_per_month.iter().enumerate() {
-        let m = if i == 1 && (year % 4 == 0 && year % 100 != 0 || year % 400 == 0) {
-            29
-        } else {
-            *dm
-        };
-        if dom < m {
-            month = i + 1;
-            break;
-        }
-        dom -= m;
-    }
-    format!(
-        "{year:04}-{:02}-{dom:02}T{hours:02}:{minutes:02}:00+00:00",
-        month
-    )
-}
-
-pub fn cmd_verify_package(args: &[String]) -> Result<(), CliError> {
-    let target = args
-        .first()
-        .ok_or_else(|| CliError::Missing("<package.json>".into()))?;
-    let raw =
-        fs::read_to_string(target).map_err(|e| CliError::NotFound(format!("{target}: {e}")))?;
-    let mut v: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| CliError::BadArgs(format!("invalid package json: {e}")))?;
-    let declared_digest = v
-        .get("package_digest")
-        .and_then(|d| d.as_str())
-        .ok_or_else(|| CliError::BadArgs("missing package_digest".into()))?
-        .to_string();
-    v.as_object_mut()
-        .and_then(|m| m.remove("package_digest"))
-        .ok_or_else(|| CliError::BadArgs("package_digest not removable".into()))?;
-    let text = serde_json::to_string_pretty(&v)
-        .map_err(|e| CliError::BadArgs(format!("re-serialize: {e}")))?;
-    let computed = sha256_hex(&text);
-    if computed != declared_digest {
-        return Err(CliError::Verify(format!(
-            "package_digest mismatch: declared={declared_digest} computed={computed}"
-        )));
-    }
-    let mission_id = v
-        .get("mission")
-        .and_then(|m| m.get("mission_id"))
-        .and_then(|s| s.as_str())
-        .unwrap_or("(unknown)");
-    println!("✓ evidence package verified — mission: {mission_id}");
-    println!("  digest:     {computed}");
-    println!(
-        "  policy:     {}",
-        v.get("policy_bundle_digest")
-            .and_then(|s| s.as_str())
-            .unwrap_or("?")
-    );
-    println!(
-        "  authority:  {}",
-        v.get("authority_public_key")
-            .and_then(|s| s.as_str())
-            .unwrap_or("?")
-    );
-    Ok(())
+    None
 }
 
 pub fn load_metadata(mission_dir: &str) -> Result<MissionMetadata, CliError> {
@@ -761,50 +320,5 @@ mod tests {
         let d1 = sha256_hex(&default_policy_bundle());
         let d2 = sha256_hex(&default_policy_bundle());
         assert_eq!(d1, d2);
-    }
-
-    #[test]
-    fn package_digest_round_trips_through_verify_package() {
-        // The writer's textual pre-digest representation must match the
-        // reader's recomputed bytes — otherwise the `verify-package`
-        // subcommand would always reject packages the writer itself built.
-        let mut pkg = serde_json::Map::new();
-        pkg.insert(
-            "package_version".into(),
-            serde_json::Value::String("aevum.evidence-package/v1".into()),
-        );
-        pkg.insert(
-            "mission".into(),
-            serde_json::json!({
-                "mission_id": "rt",
-                "title": "roundtrip",
-                "risk": "R2",
-                "constitution_digest": "sha256:abc",
-                "authority_actor": "spiffe://local.aevum/agent",
-            }),
-        );
-        pkg.insert(
-            "ledger_entries".into(),
-            serde_json::Value::String(String::new()),
-        );
-        let placeholder = serde_json::Value::Object(pkg);
-        let text = serde_json::to_string_pretty(&placeholder).unwrap();
-        let digest = sha256_hex(&text);
-        let mut with_digest = placeholder.as_object().unwrap().clone();
-        with_digest.insert(
-            "package_digest".into(),
-            serde_json::Value::String(digest.clone()),
-        );
-        let final_value = serde_json::Value::Object(with_digest);
-        let serialized = serde_json::to_string_pretty(&final_value).unwrap();
-        let mut parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
-        let declared = parsed
-            .get("package_digest")
-            .and_then(|d| d.as_str())
-            .unwrap()
-            .to_string();
-        parsed.as_object_mut().unwrap().remove("package_digest");
-        let recomputed = sha256_hex(&serde_json::to_string_pretty(&parsed).unwrap());
-        assert_eq!(declared, recomputed);
     }
 }

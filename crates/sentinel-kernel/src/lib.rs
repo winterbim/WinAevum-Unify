@@ -39,9 +39,17 @@ pub enum CapabilityError {
     },
 }
 
-const FORBIDDEN_SHELL_CHARS: &[char] = &[
-    '&', '|', ';', '`', '$', '<', '>', '\\', '\'', '"', '\n', '\r',
+/// Characters that must never appear in typed argv (union of CLI + kernel policy).
+pub const FORBIDDEN_SHELL_CHARS: &[char] = &[
+    '&', '|', ';', '`', '$', '<', '>', '\\', '\'', '"', '*', '?', '!', '\n', '\r',
 ];
+
+/// Returns the first argv token that contains a forbidden shell metacharacter.
+pub fn first_shell_metachar_arg(argv: &[String]) -> Option<&str> {
+    argv.iter()
+        .find(|part| part.chars().any(|c| FORBIDDEN_SHELL_CHARS.contains(&c)))
+        .map(|s| s.as_str())
+}
 
 /// The Sentinel Kernel — verifies that a capability invocation is well-formed
 /// (no shell metacharacters, argv matches a registered grant) and that the
@@ -109,10 +117,8 @@ impl SentinelKernel {
     /// with bound-substituted parameters or a `CapabilityError` if rejected.
     pub fn authorise(&self, req: &CapabilityRequest) -> Result<Vec<String>, CapabilityError> {
         // 1. Reject any shell metachars.
-        for part in &req.argv {
-            if part.chars().any(|c| FORBIDDEN_SHELL_CHARS.contains(&c)) {
-                return Err(CapabilityError::ArgumentRejected(part.clone()));
-            }
+        if let Some(bad) = first_shell_metachar_arg(&req.argv) {
+            return Err(CapabilityError::ArgumentRejected(bad.to_string()));
         }
         // 2. Reject `sh.execute` (impossible to enforce integrity).
         if req.capability == "sh.execute" {

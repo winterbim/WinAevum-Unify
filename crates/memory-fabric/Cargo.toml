@@ -7,13 +7,18 @@ license.workspace = true
 repository.workspace = true
 description = "Memory backends + trust-filtered context assembly (ADR-0013/P0)"
 
+[features]
+default = []
+# Opt-in remote OpenAI-compatible embeddings (pulls ureq/TLS). Off by default (ADR-0018).
+remote-embed = ["dep:ureq"]
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 sha2.workspace = true
 hex = "0.4"
-ureq = { version = "2.12", default-features = true, features = ["json"] }
+ureq = { version = "2.12", default-features = true, features = ["json"], optional = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
 aevum-evidence-graph = { path = "../evidence-graph" }
 

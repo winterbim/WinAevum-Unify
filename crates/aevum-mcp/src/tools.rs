@@ -60,14 +60,15 @@ fn tool_defs() -> Vec<Value> {
         ),
         tool(
             "aevum_graph_authorize",
-            "Attest and authorize a capability in the temporal graph",
+            "Authorize a capability with a human grant signature (P0-5 — no self-authorize)",
             json!({
                 "type": "object",
                 "properties": {
                     "capability": { "type": "string" },
-                    "reason": { "type": "string" }
+                    "reason": { "type": "string" },
+                    "grant_sig": { "type": "string", "description": "ed25519 hex from unify human-grant" }
                 },
-                "required": ["capability"]
+                "required": ["capability", "grant_sig"]
             }),
         ),
         tool(
@@ -321,6 +322,10 @@ pub fn dispatch(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, Strin
                 .and_then(|v| v.as_str())
                 .unwrap_or("mcp authorize")
                 .to_string();
+            let grant_sig = arg_str(args, "grant_sig").map_err(|_| {
+                "grant_sig required — self-authorize refused (P0-5); produce via unify human-grant"
+                    .to_string()
+            })?;
             quiet(|| {
                 aevum_unify::graph_cmd::cmd_graph(&[
                     "authorize".into(),
@@ -330,6 +335,8 @@ pub fn dispatch(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, Strin
                     cap.clone(),
                     "--reason".into(),
                     reason,
+                    "--grant-sig".into(),
+                    grant_sig,
                 ])
             })
             .map_err(|e| e.to_string())?;

@@ -12,7 +12,12 @@ fn main() -> ExitCode {
         "version": "v0",
         "aevum_passed": passed,
         "aevum_total": total,
-        "verdict": if passed == total { "AEVUM_PERFECT" } else { "AEVUM_FAIL" },
+        // Not "PERFECT": this bench is self-run in-repo (not third-party verified).
+        "verdict": if passed == total {
+            "AEVUM_SELF_RUN_PASS"
+        } else {
+            "AEVUM_FAIL"
+        },
         "cases": results,
     });
     println!("{}", serde_json::to_string_pretty(&report).unwrap());

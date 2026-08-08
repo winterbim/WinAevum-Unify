@@ -47,6 +47,50 @@ fn new_mission(work: &Path, id: &str) -> PathBuf {
     out
 }
 
+/// TEST CHANGE (P0-5): authorize now requires a human grant signature.
+fn ensure_human_key(work: &Path) {
+    let sk = work.join("human.sk");
+    if !sk.exists() {
+        std::env::set_var("AEVUM_HUMAN_KEY", &sk);
+        std::env::set_var("AEVUM_HUMAN_PUB", work.join("human.pub"));
+        aevum_unify::authority::cmd_human_keygen(&["--out".into(), sk.to_str().unwrap().into()])
+            .unwrap();
+    } else {
+        std::env::set_var("AEVUM_HUMAN_KEY", &sk);
+        std::env::set_var("AEVUM_HUMAN_PUB", work.join("human.pub"));
+    }
+}
+
+fn grant_sig(work: &Path, mission_id: &str, capability: &str, reason: &str) -> String {
+    ensure_human_key(work);
+    let key_hex = fs::read_to_string(work.join("human.sk")).unwrap();
+    let key = aevum_unify::KeyMaterial::from_secret_hex(key_hex.trim()).unwrap();
+    let msg = aevum_unify::authority::human_grant_message(mission_id, capability, reason);
+    key.sign(msg.as_bytes())
+}
+
+fn graph_authorize(work: &Path, mission: &Path, capability: &str, reason: &str) {
+    let mission_id = {
+        let meta: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(mission.join("metadata.json")).unwrap())
+                .unwrap();
+        meta["mission"]["mission_id"].as_str().unwrap().to_string()
+    };
+    let sig = grant_sig(work, &mission_id, capability, reason);
+    aevum_unify::graph_cmd::cmd_graph(&[
+        "authorize".into(),
+        "--mission".into(),
+        mission.to_str().unwrap().into(),
+        "--capability".into(),
+        capability.into(),
+        "--reason".into(),
+        reason.into(),
+        "--grant-sig".into(),
+        sig,
+    ])
+    .unwrap();
+}
+
 pub fn run_all() -> Vec<CaseResult> {
     vec![
         case_01_sh_c_denied(),
@@ -207,13 +251,28 @@ fn case_04_tampered_package() -> CaseResult {
         pkg.to_str().unwrap().into(),
     ])
     .unwrap();
+    // Keep trust sidecar; tamper body without re-signing (P0-2).
     let mut v: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&pkg).unwrap()).unwrap();
     v["mission"]["mission_id"] = serde_json::json!("TAMPERED");
     let bad = tmp.path().join("bad.json");
     fs::write(&bad, serde_json::to_string_pretty(&v).unwrap()).unwrap();
-    match aevum_unify::cmd_verify_package(&[bad.to_str().unwrap().into()]) {
-        Err(e) if e.to_string().contains("mismatch") => {
+    fs::copy(
+        format!("{}.pubkey", pkg.display()),
+        format!("{}.pubkey", bad.display()),
+    )
+    .unwrap();
+    match aevum_unify::cmd_verify_package(&[
+        bad.to_str().unwrap().into(),
+        "--trust-pubkey".into(),
+        format!("{}.pubkey", bad.display()),
+    ]) {
+        // TEST CHANGE (P0-2): rejection is signature invalid, not digest mismatch.
+        Err(e)
+            if e.to_string().contains("signature")
+                || e.to_string().contains("invalid")
+                || e.to_string().contains("mismatch") =>
+        {
             ok("ATB-04", "Tampered package rejected", e.to_string())
         }
         other => fail("ATB-04", "Tampered package rejected", format!("{other:?}")),
@@ -267,16 +326,7 @@ fn case_07_invalidated_auth() -> CaseResult {
     let tmp = tempfile::tempdir().unwrap();
     let mission = new_mission(tmp.path(), "mis_c07");
     // authorize then supersede by authorizing a different reason (invalidates prior)
-    aevum_unify::graph_cmd::cmd_graph(&[
-        "authorize".into(),
-        "--mission".into(),
-        mission.to_str().unwrap().into(),
-        "--capability".into(),
-        "bench.temp".into(),
-        "--reason".into(),
-        "first".into(),
-    ])
-    .unwrap();
+    graph_authorize(tmp.path(), &mission, "bench.temp", "first");
     let mut b = NativeBackend::open(&mission).unwrap();
     assert!(b
         .graph()
@@ -789,11 +839,22 @@ fn case_17_package_binds_ledger_after_effects() -> CaseResult {
             format!("bad audit_trail_digest={audit_d}"),
         );
     }
-    ok(
-        "ATB-17",
-        "Package binds non-empty ledger after effects",
-        format!("ledger_bytes={} audit={}", ledger.len(), audit_d),
-    )
+    match aevum_unify::cmd_verify_package(&[pkg.to_str().unwrap().into()]) {
+        Ok(()) => ok(
+            "ATB-17",
+            "Package binds non-empty ledger after effects",
+            format!(
+                "ledger_bytes={} audit={} verify-package=ok",
+                ledger.len(),
+                audit_d
+            ),
+        ),
+        Err(e) => fail(
+            "ATB-17",
+            "Package binds non-empty ledger after effects",
+            format!("verify-package rejected honest package: {e}"),
+        ),
+    }
 }
 
 fn case_18_dream_doctor_loud_deny() -> CaseResult {

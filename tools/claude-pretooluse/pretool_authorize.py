@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""PreToolUse → Aevum authorize bridge (Trusted Autonomy Hub).
+"""PreToolUse → Aevum authorize bridge (fail-closed, P0-4).
 
-Reads Claude Code hook JSON on stdin. Denies sh -c (D14). Optionally calls
-`unify` / aevum_pretool_check when AEVUM_MISSION is set.
+Reads Claude Code hook JSON on stdin. Always delegates to
+`unify pretool-check` (same require_authorized path as the Rust kernel).
+Absence of AEVUM_MISSION → deny. Never soft-allows baseline capabilities.
 """
 from __future__ import annotations
 
@@ -25,76 +26,48 @@ def main() -> int:
     if isinstance(tool_input, dict):
         command = str(tool_input.get("command") or tool_input.get("cmd") or "")
 
-    # D14 — never allow shell-string execution
-    lowered = f"{tool} {command}".lower()
-    if "sh -c" in lowered or "bash -c" in lowered:
-        print(
-            json.dumps(
-                {
-                    "decision": "deny",
-                    "reason": "Aevum D14: sh -c / bash -c denied — use process.exec.argv via unify exec",
-                }
-            )
-        )
-        return 0
-
-    mission = os.environ.get("AEVUM_MISSION", "").strip()
-    if not mission:
-        # Soft allow when no mission bound — still blocked sh -c above
-        print(json.dumps({"decision": "allow", "reason": "no AEVUM_MISSION — D14 only"}))
-        return 0
-
-    # Map tools → capabilities
     cap = "process.exec.argv"
     if tool in ("Edit", "Write", "MultiEdit"):
         cap = "graph.write"
     elif tool == "Bash":
         cap = "process.exec.argv"
 
+    mission = os.environ.get("AEVUM_MISSION", "").strip()
     unify = os.environ.get("UNIFY_BIN", "unify")
-    # Prefer MCP-equivalent check via unify graph / a lightweight CLI probe
+    argv = [unify, "pretool-check", "--capability", cap, "--tool", str(tool)]
+    if mission:
+        argv.extend(["--mission", mission])
+    if command:
+        argv.extend(["--command", command])
+
     try:
-        # Use graph search as presence check; capability gate via unify run --dry not available —
-        # invoke aevum-mcp tool through a tiny rust-free path: unify exec denied without auth.
-        # Fall back to reading graph.json for authorizes fact.
-        graph = os.path.join(mission, "graph.json")
-        if os.path.isfile(graph):
-            data = json.loads(open(graph, encoding="utf-8").read())
-            facts = data.get("facts") or data.get("active_facts") or []
-            # Snapshot shape may nest differently — also check events
-            authorized = False
-            blob = json.dumps(data).lower()
-            if cap.lower() in blob and "authorizes" in blob:
-                authorized = True
-            if not authorized and facts:
-                for f in facts:
-                    kind = str(f.get("kind") or f.get("name") or "").lower()
-                    if "authoriz" in kind and cap.split(".")[0] in json.dumps(f).lower():
-                        authorized = True
-                        break
-            if not authorized:
-                # Baseline caps are usually seeded — allow process.exec.argv / graph.write if mission exists
-                if cap in ("process.exec.argv", "graph.write", "git.branch.create", "graph.read"):
-                    authorized = True
-            if not authorized:
-                print(
-                    json.dumps(
-                        {
-                            "decision": "deny",
-                            "reason": f"Aevum: capability {cap} not authorized for tool {tool}",
-                        }
-                    )
-                )
-                return 0
-    except Exception as e:
-        print(json.dumps({"decision": "deny", "reason": f"Aevum pretool error: {e}"}))
+        proc = subprocess.run(argv, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        print(
+            json.dumps(
+                {
+                    "decision": "deny",
+                    "reason": f"unify binary not found ({unify}) — fail-closed",
+                }
+            )
+        )
         return 0
+
+    out = (proc.stdout or "").strip()
+    if out:
+        # Prefer the JSON decision line from unify.
+        try:
+            decision = json.loads(out.splitlines()[-1])
+            print(json.dumps(decision))
+            return 0
+        except json.JSONDecodeError:
+            pass
 
     print(
         json.dumps(
             {
-                "decision": "allow",
-                "reason": f"Aevum PreToolUse allow tool={tool} cap={cap}",
+                "decision": "deny",
+                "reason": (proc.stderr or out or "pretool-check failed").strip()[:500],
             }
         )
     )

@@ -6,14 +6,15 @@ use std::process::Command;
 
 use serde_json::json;
 
-use crate::{cmd_new, cmd_package, require_value, sha256_hex, CliError};
+use crate::package::{cmd_package, package_ids};
+use crate::{cmd_new, optional_value, require_value, CliError};
 
 /// `unify parallel --constitution <c.json> --out <dir> --n <k>`
 /// Creates N mission directories under out, packages each, writes compare.json.
 pub fn cmd_parallel(args: &[String]) -> Result<(), CliError> {
     let constitution = require_value(args, "--constitution")?;
     let out = require_value(args, "--out")?;
-    let n: usize = optional(args, "--n")
+    let n: usize = optional_value(args, "--n")
         .and_then(|s| s.parse().ok())
         .unwrap_or(2)
         .clamp(2, 8);
@@ -23,7 +24,6 @@ pub fn cmd_parallel(args: &[String]) -> Result<(), CliError> {
     for i in 0..n {
         let mission = Path::new(&out).join(format!("mission-{i}"));
         let pkg = Path::new(&out).join(format!("pkg-{i}.json"));
-        // Variant stamp in a copy of constitution so digests differ by mission_id
         let raw = fs::read_to_string(&constitution)
             .map_err(|e| CliError::Io(format!("read constitution: {e}")))?;
         let mut v: serde_json::Value = serde_json::from_str(&raw)
@@ -47,19 +47,13 @@ pub fn cmd_parallel(args: &[String]) -> Result<(), CliError> {
             pkg.to_string_lossy().into(),
         ])?;
         let body = fs::read_to_string(&pkg).unwrap_or_default();
-        let digest = serde_json::from_str::<serde_json::Value>(&body)
-            .ok()
-            .and_then(|j| {
-                j.get("package_digest")
-                    .and_then(|d| d.as_str())
-                    .map(|s| s.to_string())
-            })
-            .unwrap_or_else(|| sha256_hex(&body));
+        let (sig, content_sha) = package_ids(&body);
         packages.push(json!({
             "index": i,
             "mission": mission.display().to_string(),
             "package": pkg.display().to_string(),
-            "package_digest": digest,
+            "package_signature": sig.unwrap_or_else(|| "missing".into()),
+            "package_content_sha256": content_sha,
         }));
         println!("✓ parallel variant {i} → {}", pkg.display());
     }
@@ -67,7 +61,7 @@ pub fn cmd_parallel(args: &[String]) -> Result<(), CliError> {
     let compare = json!({
         "n": n,
         "variants": packages,
-        "note": "Compare digests / graphs; pick winner then attest — never auto-merge",
+        "note": "Compare signatures / graphs; pick winner then attest — never auto-merge",
         "auto_merge": false,
     });
     let compare_path = Path::new(&out).join("compare.json");
@@ -84,7 +78,7 @@ pub fn cmd_parallel(args: &[String]) -> Result<(), CliError> {
 pub fn cmd_parallel_worktrees(args: &[String]) -> Result<(), CliError> {
     let repo = require_value(args, "--repo")?;
     let out = require_value(args, "--out")?;
-    let n: usize = optional(args, "--n")
+    let n: usize = optional_value(args, "--n")
         .and_then(|s| s.parse().ok())
         .unwrap_or(2)
         .clamp(2, 4);
@@ -112,8 +106,4 @@ pub fn cmd_parallel_worktrees(args: &[String]) -> Result<(), CliError> {
         println!("✓ worktree {i} → {}", wt.display());
     }
     Ok(())
-}
-
-fn optional(args: &[String], key: &str) -> Option<String> {
-    args.windows(2).find(|w| w[0] == key).map(|w| w[1].clone())
 }

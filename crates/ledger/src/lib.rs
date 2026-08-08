@@ -52,6 +52,10 @@ pub struct Signature {
     pub public_bytes: String,
 }
 
+/// Genesis previous-digest for an empty chain.
+pub const GENESIS_DIGEST: &str =
+    "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+
 pub struct TrustLedger {
     entries: Vec<LedgerEntry>,
     pub key: Identity,
@@ -77,8 +81,7 @@ impl TrustLedger {
     pub fn last_digest(&self) -> String {
         match self.entries.last() {
             Some(e) => digest_entry(e),
-            None => "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-                .to_string(),
+            None => GENESIS_DIGEST.to_string(),
         }
     }
 
@@ -102,36 +105,85 @@ impl TrustLedger {
     }
 
     pub fn verify(&self) -> Result<u64, LedgerError> {
-        let mut prev =
-            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string();
-        for (idx, entry) in self.entries.iter().enumerate() {
-            let seq = (idx + 1) as u64;
-            if entry.sequence != seq {
-                return Err(LedgerError::BadDigest {
-                    seq,
-                    expected: seq.to_string(),
-                    actual: entry.sequence.to_string(),
-                });
-            }
-            if entry.previous_digest != prev {
-                return Err(LedgerError::ChainBroken {
-                    seq,
-                    expected: prev,
-                    actual: entry.previous_digest.clone(),
-                });
-            }
-            let sig = entry
-                .signature
-                .as_ref()
-                .ok_or(LedgerError::BadSignature { seq })?;
-            let d = digest_entry(entry);
-            if self.key.key.verify(&sig.value, d.as_bytes()).is_err() {
-                return Err(LedgerError::BadSignature { seq });
-            }
-            prev = d;
-        }
+        verify_chain_with_public(&self.entries, &hex::encode(self.key.key.public_bytes()))?;
         Ok(self.entries.len() as u64)
     }
+
+    /// Load a JSONL ledger that already verifies against `signer`'s public key.
+    pub fn from_jsonl(signer: Identity, text: &str) -> Result<Self, LedgerError> {
+        let entries = parse_jsonl(text)?;
+        let pub_hex = hex::encode(signer.key.public_bytes());
+        verify_chain_with_public(&entries, &pub_hex)?;
+        Ok(Self {
+            entries,
+            key: signer,
+        })
+    }
+
+    /// Serialize entries as JSONL (one LedgerEntry per line, trailing newline).
+    pub fn to_jsonl(&self) -> String {
+        entries_to_jsonl(&self.entries)
+    }
+}
+
+pub fn parse_jsonl(text: &str) -> Result<Vec<LedgerEntry>, LedgerError> {
+    let mut out = Vec::new();
+    for (i, line) in text.lines().filter(|l| !l.trim().is_empty()).enumerate() {
+        let entry: LedgerEntry =
+            serde_json::from_str(line).map_err(|_| LedgerError::BadDigest {
+                seq: (i + 1) as u64,
+                expected: "valid LedgerEntry json".into(),
+                actual: format!("line {}", i + 1),
+            })?;
+        out.push(entry);
+    }
+    Ok(out)
+}
+
+pub fn entries_to_jsonl(entries: &[LedgerEntry]) -> String {
+    let mut s = String::new();
+    for e in entries {
+        s.push_str(&serde_json::to_string(e).unwrap_or_default());
+        s.push('\n');
+    }
+    s
+}
+
+/// Verify a chain using only a public key (no secret required).
+/// Returns the last entry digest (or [`GENESIS_DIGEST`] if empty).
+pub fn verify_chain_with_public(
+    entries: &[LedgerEntry],
+    public_hex: &str,
+) -> Result<String, LedgerError> {
+    let mut prev = GENESIS_DIGEST.to_string();
+    let mut last = prev.clone();
+    for (idx, entry) in entries.iter().enumerate() {
+        let seq = (idx + 1) as u64;
+        if entry.sequence != seq {
+            return Err(LedgerError::BadDigest {
+                seq,
+                expected: seq.to_string(),
+                actual: entry.sequence.to_string(),
+            });
+        }
+        if entry.previous_digest != prev {
+            return Err(LedgerError::ChainBroken {
+                seq,
+                expected: prev,
+                actual: entry.previous_digest.clone(),
+            });
+        }
+        let sig = entry
+            .signature
+            .as_ref()
+            .ok_or(LedgerError::BadSignature { seq })?;
+        let d = digest_entry(entry);
+        aevum_identity::verify_signature_hex(public_hex, &sig.value, d.as_bytes())
+            .map_err(|_| LedgerError::BadSignature { seq })?;
+        prev = d.clone();
+        last = d;
+    }
+    Ok(last)
 }
 
 pub fn digest_entry(e: &LedgerEntry) -> String {
@@ -230,5 +282,23 @@ mod tests {
         let d1 = digest_entry(&e);
         let d2 = digest_entry(&e);
         assert_eq!(d1, d2);
+    }
+
+    #[test]
+    fn jsonl_round_trip_verifies() {
+        let mut ledger = TrustLedger::new(Identity::ephemeral("ledger-authority"));
+        ledger
+            .append(evt("mission.created", json!({"a": 1})))
+            .unwrap();
+        ledger
+            .append(evt("capability.effect", json!({"cap": "x"})))
+            .unwrap();
+        let text = ledger.to_jsonl();
+        let pub_hex = hex::encode(ledger.key.key.public_bytes());
+        let tip = verify_chain_with_public(&parse_jsonl(&text).unwrap(), &pub_hex).unwrap();
+        assert_eq!(tip, ledger.last_digest());
+        let reloaded = TrustLedger::from_jsonl(ledger.key.clone(), &text).unwrap();
+        assert_eq!(reloaded.length(), 2);
+        reloaded.verify().unwrap();
     }
 }
