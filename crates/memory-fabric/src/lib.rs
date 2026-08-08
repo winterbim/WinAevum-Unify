@@ -17,12 +17,12 @@ pub mod sqlite;
 
 pub use assembly::{assemble, AssembledContext, AssemblyRequest, RankedHit};
 pub use backend::{MemoryBackend, MemoryError, MemoryHit, MemorySource, RemoteFact};
+#[cfg(feature = "remote-embed")]
+pub use embed::OpenAiCompatibleEmbedder;
 pub use embed::{
     default_embedder, ensure_node_embeddings, semantic_hybrid_search,
     semantic_hybrid_search_scoped, EmbedError, Embedder, HashingEmbedder,
 };
-#[cfg(feature = "remote-embed")]
-pub use embed::OpenAiCompatibleEmbedder;
 pub use extract::{
     ingest_structured_json, ingest_text_triples, ExtractError, IngestReport, StructuredEpisodeDoc,
     StructuredFact,

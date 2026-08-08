@@ -110,11 +110,7 @@ impl KeyMaterial {
     }
 
     pub fn verify(&self, signature_hex: &str, message: &[u8]) -> Result<(), KeyError> {
-        verify_signature_hex(
-            &hex::encode(self.public_bytes()),
-            signature_hex,
-            message,
-        )
+        verify_signature_hex(&hex::encode(self.public_bytes()), signature_hex, message)
     }
 }
 

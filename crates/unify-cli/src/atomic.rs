@@ -13,9 +13,7 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
     fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
     let tmp = parent.join(format!(
         ".{}.tmp.{}",
-        path.file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("aevum"),
+        path.file_name().and_then(|s| s.to_str()).unwrap_or("aevum"),
         std::process::id()
     ));
     {

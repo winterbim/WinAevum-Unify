@@ -1,6 +1,6 @@
 # WinAevum-Unify — STATE_OF_TRUTH
 
-**Version:** 2026-08-08 (P0 trust-path remédiation)  
+**Version:** 2026-08-08 (P0 remédiation + quality hardening)  
 **Authority:** Winter Fernandes  
 **Source:** Blueprint + ADRs through ADR-0021 + Agent Dream + P0 security  
 **Public repo:** `https://github.com/winterbim/WinAevum-Unify`  
@@ -12,7 +12,9 @@
 - Memory is native-only by default (SQLite + FTS5 + BM25 + RRF + local CE). Remote embeddings require feature `remote-embed` + `AEVUM_ALLOW_REMOTE_EMBED=1` (ADR-0018 re-evidenced 2026-08-08).
 - CLI: `new` / `run` / `exec` / `graph` / `slop` / `rules` / `parallel` / `golden` / `falsify` / `doctor` / `dream` / `package` / `verify-package` / `human-keygen` / `human-grant` / `pretool-check` / `debug-now` / `mcp --write-config`.
 - Evidence packages are **Ed25519-signed** (`aevum.evidence-package/v2`) with trust pubkey sidecar; authority secret lives in `{mission}/.aevum/authority.sk` (never packaged).
-- Ledger entries are signed end-to-end with tip anchor; `unify verify` reads `ledger.jsonl` + tip.
+- Ledger entries are signed end-to-end with tip anchor; `unify verify` requires ledger/audit byte-identity + tip.
+- `verify-package` verifies envelope signature, key bind, and embedded ledger (not signature-only).
+- Dependency license gate: `cargo deny check` (`deny.toml`, L-38 EVIDENCED).
 - `graph authorize` requires a human grant signature (distinct principal — P0-5).
 - PreToolUse + `pretool-check` + MCP authz are fail-closed (P0-4).
 - Agent Dream: loud Inference denials; `unify doctor` / `unify dream`.
@@ -31,12 +33,11 @@
 
 ## Proof ledger
 
-`python3 scripts/ledger_check.py .project/LEDGER.md` — see LEDGER for CLAIMED vs EVIDENCED (L-38 still CLAIMED: license gate is file existence until cargo-deny).
+`python3 scripts/ledger_check.py .project/LEDGER.md` — see LEDGER for CLAIMED vs EVIDENCED.
 
 ## Residual gaps (honest)
 
 - Independent 20-agent adversarial re-audit in a **fresh clone/session** not yet run (publication gate).
-- L-38 license gate still needs `cargo deny` (not just `test -f`).
 - Human key must stay outside the agent sandbox (operator responsibility).
 - Live GitHub PR merge with `aevum-gate` against remote not dogfooded end-to-end.
 - Managed multi-tenant cloud is not the focus.

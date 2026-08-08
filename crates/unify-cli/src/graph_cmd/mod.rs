@@ -3,206 +3,21 @@
 //! Differentiator: the graph is not just memory —
 //! `run` / `exec` refuse capabilities without an active `authorizes` fact.
 
+mod gate;
+mod io;
+
+pub use gate::{record_denial_episode, require_authorized, require_falsifier_if_needed};
+pub use io::{graph_path, load_graph, save_graph, seed_and_persist, GRAPH_FILE};
+
 use std::fs;
 use std::path::Path;
 
 use aevum_evidence_graph::{
     hybrid_search, EdgeKind, Episode, EpisodeSource, EpistemicKind, Fact, FirewallVerdict,
-    GraphNode, GraphSnapshot, NodeKind, SearchRecipe, TemporalGraph,
+    GraphNode, NodeKind, SearchRecipe,
 };
 
-use crate::{chrono_now_iso, require_value, sha256_hex, CliError};
-
-pub const GRAPH_FILE: &str = "graph.json";
-
-pub fn graph_path(mission_dir: &str) -> std::path::PathBuf {
-    Path::new(mission_dir).join(GRAPH_FILE)
-}
-
-pub fn load_graph(mission_dir: &str) -> Result<TemporalGraph, CliError> {
-    let p = graph_path(mission_dir);
-    if !p.exists() {
-        return Err(CliError::Verify(format!(
-            "missing {GRAPH_FILE} — mission was not seeded with a temporal graph (re-run unify new)"
-        )));
-    }
-    let raw = fs::read_to_string(&p).map_err(|e| CliError::Io(format!("reading graph: {e}")))?;
-    let snap: GraphSnapshot = serde_json::from_str(&raw)
-        .map_err(|e| CliError::BadArgs(format!("invalid graph.json: {e}")))?;
-    TemporalGraph::from_snapshot(snap).map_err(|e| CliError::Verify(format!("graph load: {e}")))
-}
-
-pub fn save_graph(mission_dir: &str, g: &TemporalGraph) -> Result<(), CliError> {
-    let snap = g.to_snapshot();
-    let text = serde_json::to_string_pretty(&snap)
-        .map_err(|e| CliError::Io(format!("serialize graph: {e}")))?;
-    crate::atomic::atomic_write(&graph_path(mission_dir), text.as_bytes())
-        .map_err(|e| CliError::Io(format!("writing graph.json: {e}")))?;
-    // Keep SQLite twin in sync when durable store is enabled (default).
-    let store = std::env::var("AEVUM_GRAPH_STORE").unwrap_or_else(|_| "sqlite".into());
-    if store != "json" {
-        use aevum_memory_fabric::{MemoryBackend, SqliteBackend};
-        if let Ok(mut sb) = SqliteBackend::open(mission_dir) {
-            *sb.graph_mut() = TemporalGraph::from_snapshot(snap)
-                .map_err(|e| CliError::Verify(format!("sqlite twin: {e}")))?;
-            sb.save()
-                .map_err(|e| CliError::Io(format!("sqlite twin save: {e}")))?;
-        }
-    }
-    Ok(())
-}
-
-/// Seed graph at mission creation — constitution is primary attested evidence.
-pub fn seed_and_persist(
-    mission_dir: &str,
-    mission_id: &str,
-    constitution_src: &str,
-    constitution_digest: &str,
-) -> Result<(), CliError> {
-    let now = chrono_now_iso();
-    // Baseline capabilities the local-first MVP may exercise without extra authorize.
-    // Higher-risk caps must be added via `unify graph authorize`.
-    let caps = [
-        "git.branch.create",
-        "process.exec.argv",
-        "graph.read",
-        "graph.write",
-    ];
-    let g = TemporalGraph::seed_for_mission(
-        mission_id,
-        constitution_src,
-        constitution_digest,
-        &caps,
-        &now,
-    )
-    .map_err(|e| CliError::Verify(format!("seed graph: {e}")))?;
-    save_graph(mission_dir, &g)?;
-    Ok(())
-}
-
-/// Trust gate: capability must be actively authorized in the temporal graph.
-pub fn require_authorized(mission_dir: &str, capability: &str) -> Result<(), CliError> {
-    let g = load_graph(mission_dir)?;
-    let now = chrono_now_iso();
-    if g.capability_authorized(capability, &now) {
-        return Ok(());
-    }
-    let reason = format!(
-        "capability `{capability}` is not authorized by the temporal graph at {now} \
-         (need active authorizes edge → action:{capability}; use `unify graph authorize`)"
-    );
-    // Never silent: if even the refusal cannot be recorded, say so — the
-    // refusal itself still stands.
-    if let Err(e) = record_denial_episode(mission_dir, capability, &reason) {
-        eprintln!("warning: denial episode not recorded for `{capability}`: {e}");
-    }
-    Err(CliError::Verify(reason))
-}
-
-/// Loud deny: Inference episode so agents never face silent failure.
-pub fn record_denial_episode(
-    mission_dir: &str,
-    capability: &str,
-    reason: &str,
-) -> Result<(), CliError> {
-    use aevum_evidence_graph::{relate_fact, seed_entity, Episode, EpisodeSource, EpistemicKind};
-    use aevum_memory_fabric::{MemoryBackend, SqliteBackend};
-
-    let meta = crate::load_metadata(mission_dir)?;
-    let mut g = load_graph(mission_dir)?;
-    let now = chrono_now_iso();
-    let group = format!("mission:{}", meta.mission.mission_id);
-    let digest = crate::sha256_hex(&format!("{now}|{capability}|{reason}"));
-    let ep_id = format!("ep:deny:{}", &digest[7..19]);
-    g.add_episode(Episode {
-        id: ep_id.clone(),
-        mission_id: meta.mission.mission_id.clone(),
-        group_id: group.clone(),
-        source: EpisodeSource::Json,
-        content: serde_json::json!({
-            "kind": "DENIED_CAPABILITY",
-            "capability": capability,
-            "reason": reason,
-        })
-        .to_string(),
-        content_digest: Some(digest),
-        valid_at: now.clone(),
-        created_at: now.clone(),
-        actor_id: Some("aevum-firewall".into()),
-    })
-    .map_err(|e| CliError::Verify(e.to_string()))?;
-    g.upsert_node(seed_entity(
-        "ent:firewall",
-        "aevum-firewall",
-        &meta.mission.mission_id,
-        &group,
-        &now,
-    ));
-    g.upsert_node(seed_entity(
-        &format!("action:{capability}"),
-        capability,
-        &meta.mission.mission_id,
-        &group,
-        &now,
-    ));
-    let fact = relate_fact(
-        &format!("fact:deny:{ep_id}"),
-        "ent:firewall",
-        &format!("action:{capability}"),
-        "DENIED_CAPABILITY",
-        reason,
-        &ep_id,
-        &now,
-        &now,
-        &meta.mission.mission_id,
-        &group,
-        EpistemicKind::Inference,
-    );
-    g.assert_fact(fact)
-        .map_err(|e| CliError::Verify(e.to_string()))?;
-    save_graph(mission_dir, &g)?;
-    if let Ok(mut sb) = SqliteBackend::open(mission_dir) {
-        *sb.graph_mut() = g;
-        let _ = sb.save();
-    }
-    Ok(())
-}
-
-/// R3+ requires an independent falsifier challenge on record (Council invariant).
-pub fn require_falsifier_if_needed(
-    mission_dir: &str,
-    risk: aevum_autonomy_governor::RiskClass,
-) -> Result<(), CliError> {
-    use aevum_autonomy_governor::RiskClass;
-    if risk.rank() < RiskClass::R3.rank() {
-        return Ok(());
-    }
-    let path = Path::new(mission_dir).join("falsifier.jsonl");
-    if !path.exists() {
-        return Err(CliError::Verify(
-            "R3+ blocked: missing falsifier.jsonl — run `unify falsify --mission … --reason …`"
-                .into(),
-        ));
-    }
-    let raw = fs::read_to_string(&path).map_err(|e| CliError::Io(e.to_string()))?;
-    let count = raw.lines().filter(|l| !l.trim().is_empty()).count();
-    if count == 0 {
-        return Err(CliError::Verify(
-            "R3+ blocked: falsifier.jsonl is empty".into(),
-        ));
-    }
-    // Must include at least one entry from a falsifier role
-    let has_falsifier = raw.lines().filter(|l| !l.trim().is_empty()).any(|l| {
-        let v: serde_json::Value = serde_json::from_str(l).unwrap_or_default();
-        v.get("role").and_then(|r| r.as_str()) == Some("falsifier")
-    });
-    if !has_falsifier {
-        return Err(CliError::Verify(
-            "R3+ blocked: no falsifier-role challenge recorded".into(),
-        ));
-    }
-    Ok(())
-}
+use crate::{chrono_now_iso, optional_value, require_value, sha256_hex, CliError};
 
 /// Record an independent falsifier objection (required before R3+ effects).
 pub fn cmd_falsify(args: &[String]) -> Result<(), CliError> {
@@ -622,17 +437,6 @@ fn graph_contradictions(args: &[String]) -> Result<(), CliError> {
         println!("✓ resolved {n} parallel conflict(s) (older invalidated)");
     }
     Ok(())
-}
-
-fn optional_value(args: &[String], key: &str) -> Option<String> {
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == key {
-            return args.get(i + 1).cloned();
-        }
-        i += 1;
-    }
-    None
 }
 
 /// Trust-filtered context assembly (raw recall never authorizes).

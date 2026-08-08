@@ -12,11 +12,20 @@
 - Clock via `chrono::Utc`; critical writes via tempfile + fsync + rename.
 - `doctor` hard-fails on corrupt/unsigned ledgers.
 
+### Quality
+
+- CLI modules: `ledger_io`, `package`, `mission_ops`, `hooks`; `graph_cmd/{io,gate,mod}`.
+- Append/verify via `TrustLedger`; exec metachar via sentinel shared policy.
+- Golden/parallel emit `package_signature` (+ informational content sha).
+- `verify-package` binds trust key ↔ `authority_public_key` and verifies embedded ledger.
+- `verify`/`doctor` fail-closed on ledger/audit byte divergence.
+- L-38: `deny.toml` + `cargo deny check` in `scripts/prepub-verify.sh`.
+
 ### Doctrine
 
 - Remote HTTP embeddings gated behind cargo feature `remote-embed` (default **off**).
 - Bench verdicts: `AEVUM_SELF_RUN_PASS` / `AEVUM_MEMORY_SELF_RUN_PASS` (not “PERFECT”).
-- L-37 re-evidenced; L-38 remains CLAIMED until `cargo deny` replaces `test -f` license gate.
+- L-37 / L-38 EVIDENCED.
 
 ### Docs
 

@@ -40,8 +40,10 @@ pnpm -r lint
 pnpm -r build
 pnpm -r test
 
-echo "==> licenses"
+echo "==> licenses (files + cargo-deny)"
 test -f LICENSE && test -f LICENSE-MIT && test -f LICENSE-APACHE
+command -v cargo-deny >/dev/null || die "cargo-deny not installed (cargo install cargo-deny)"
+cargo deny check
 
 echo "==> no competitor memory-vendor names"
 # Pattern is intentional; exclude this script so the checker is not a self-hit.

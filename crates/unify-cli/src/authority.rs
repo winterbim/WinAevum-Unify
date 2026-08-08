@@ -62,8 +62,8 @@ pub fn load_authority_secret(mission_dir: &str) -> Result<KeyMaterial, CliError>
     let meta_path = Path::new(mission_dir).join("metadata.json");
     let raw = fs::read_to_string(&meta_path)
         .map_err(|e| CliError::NotFound(format!("metadata.json: {e}")))?;
-    let v: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| CliError::BadArgs(format!("metadata json: {e}")))?;
+    let v: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|e| CliError::BadArgs(format!("metadata json: {e}")))?;
     let legacy = v
         .get("authority_secret_key_hex")
         .and_then(|s| s.as_str())
@@ -98,7 +98,11 @@ pub fn load_authority_public_hex(mission_dir: &str) -> Result<String, CliError> 
     Ok(meta.authority_public_key)
 }
 
-pub fn write_ledger_tip(mission_dir: &str, last_digest: &str, key: &KeyMaterial) -> Result<(), CliError> {
+pub fn write_ledger_tip(
+    mission_dir: &str,
+    last_digest: &str,
+    key: &KeyMaterial,
+) -> Result<(), CliError> {
     ensure_aevum_dir(mission_dir)?;
     let sig = key.sign(last_digest.as_bytes());
     atomic_write(&ledger_tip_path(mission_dir), sig.as_bytes()).map_err(CliError::Io)?;
@@ -106,7 +110,11 @@ pub fn write_ledger_tip(mission_dir: &str, last_digest: &str, key: &KeyMaterial)
     Ok(())
 }
 
-pub fn verify_ledger_tip(mission_dir: &str, last_digest: &str, public_hex: &str) -> Result<(), CliError> {
+pub fn verify_ledger_tip(
+    mission_dir: &str,
+    last_digest: &str,
+    public_hex: &str,
+) -> Result<(), CliError> {
     let tip = ledger_tip_path(mission_dir);
     if !tip.exists() {
         if last_digest.starts_with("sha256:0000") || last_digest == "sha256:genesis" {
@@ -116,8 +124,8 @@ pub fn verify_ledger_tip(mission_dir: &str, last_digest: &str, public_hex: &str)
             "missing .aevum/ledger.tip — ledger tip is not anchored".into(),
         ));
     }
-    let sig = fs::read_to_string(&tip)
-        .map_err(|e| CliError::Io(format!("reading ledger.tip: {e}")))?;
+    let sig =
+        fs::read_to_string(&tip).map_err(|e| CliError::Io(format!("reading ledger.tip: {e}")))?;
     verify_signature_hex(public_hex, sig.trim(), last_digest.as_bytes())
         .map_err(|e| CliError::Verify(format!("ledger tip signature invalid: {e}")))
 }

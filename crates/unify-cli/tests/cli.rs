@@ -734,6 +734,59 @@ fn run_rejects_unauthorized_capability() {
 }
 
 #[test]
+fn verify_fails_on_ledger_audit_byte_divergence() {
+    let tmp = TempDir::new().unwrap();
+    let constitution = write_min_constitution(tmp.path(), "mis_div");
+    let mission = tmp.path().join("mission");
+    bin()
+        .args([
+            "new",
+            "--constitution",
+            constitution.to_str().unwrap(),
+            "--out",
+            mission.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    authorize(tmp.path(), &mission, "git.branch.create", "div test");
+    let run = bin()
+        .args([
+            "run",
+            "--mission",
+            mission.to_str().unwrap(),
+            "--capability",
+            "git.branch.create",
+            "--argv",
+            "git checkout -b div",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    // Same line count, different bytes — must fail-closed.
+    fs::write(
+        mission.join("audit_trail.jsonl"),
+        fs::read_to_string(mission.join("ledger.jsonl"))
+            .unwrap()
+            .replace("git.branch.create", "git.branch.TAMPERED"),
+    )
+    .unwrap();
+    let v = bin()
+        .args(["verify", mission.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!v.status.success());
+    let err = String::from_utf8_lossy(&v.stderr);
+    assert!(
+        err.to_lowercase().contains("divergence") || err.to_lowercase().contains("byte"),
+        "stderr: {err}"
+    );
+}
+
+#[test]
 fn graph_status_and_search_work() {
     let tmp = TempDir::new().unwrap();
     let constitution = write_min_constitution(tmp.path(), "mis_graph");

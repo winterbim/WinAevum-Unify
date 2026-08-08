@@ -257,7 +257,11 @@ fn case_04_tampered_package() -> CaseResult {
     v["mission"]["mission_id"] = serde_json::json!("TAMPERED");
     let bad = tmp.path().join("bad.json");
     fs::write(&bad, serde_json::to_string_pretty(&v).unwrap()).unwrap();
-    fs::copy(format!("{}.pubkey", pkg.display()), format!("{}.pubkey", bad.display())).unwrap();
+    fs::copy(
+        format!("{}.pubkey", pkg.display()),
+        format!("{}.pubkey", bad.display()),
+    )
+    .unwrap();
     match aevum_unify::cmd_verify_package(&[
         bad.to_str().unwrap().into(),
         "--trust-pubkey".into(),
@@ -835,11 +839,22 @@ fn case_17_package_binds_ledger_after_effects() -> CaseResult {
             format!("bad audit_trail_digest={audit_d}"),
         );
     }
-    ok(
-        "ATB-17",
-        "Package binds non-empty ledger after effects",
-        format!("ledger_bytes={} audit={}", ledger.len(), audit_d),
-    )
+    match aevum_unify::cmd_verify_package(&[pkg.to_str().unwrap().into()]) {
+        Ok(()) => ok(
+            "ATB-17",
+            "Package binds non-empty ledger after effects",
+            format!(
+                "ledger_bytes={} audit={} verify-package=ok",
+                ledger.len(),
+                audit_d
+            ),
+        ),
+        Err(e) => fail(
+            "ATB-17",
+            "Package binds non-empty ledger after effects",
+            format!("verify-package rejected honest package: {e}"),
+        ),
+    }
 }
 
 fn case_18_dream_doctor_loud_deny() -> CaseResult {

@@ -14,7 +14,8 @@ use aevum_memory_fabric::{open_backend, MemoryBackend};
 use serde_json::json;
 
 use crate::graph_cmd::{require_authorized, require_falsifier_if_needed};
-use crate::{cmd_package, load_metadata, require_value, sha256_hex, CliError};
+use crate::package::{cmd_package, package_ids};
+use crate::{load_metadata, require_value, CliError};
 
 pub fn cmd_golden(args: &[String]) -> Result<(), CliError> {
     let mission = require_value(args, "--mission")?;
@@ -126,6 +127,8 @@ pub fn cmd_golden(args: &[String]) -> Result<(), CliError> {
     // 4) PR draft (never merge)
     let backend = open_backend(&mission).map_err(|e| CliError::Verify(e.to_string()))?;
     let backend_name = MemoryBackend::name(backend.as_ref());
+    let pkg_body = fs::read_to_string(&pkg).unwrap_or_default();
+    let (pkg_sig, pkg_content_sha) = package_ids(&pkg_body);
     let draft = json!({
         "schema": "aevum.pr-draft/v1",
         "title": title,
@@ -140,7 +143,8 @@ pub fn cmd_golden(args: &[String]) -> Result<(), CliError> {
         ),
         "auto_merge": false,
         "package_path": pkg,
-        "package_digest": sha256_hex(&fs::read_to_string(&pkg).unwrap_or_default()),
+        "package_signature": pkg_sig.unwrap_or_else(|| "missing".into()),
+        "package_content_sha256": pkg_content_sha,
         "mission_id": meta.mission.mission_id,
         "test_log_bytes": test_log.len(),
     });
