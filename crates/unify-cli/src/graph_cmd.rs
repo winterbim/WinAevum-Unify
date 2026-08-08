@@ -576,6 +576,7 @@ pub fn cmd_context(args: &[String]) -> Result<(), CliError> {
 }
 
 /// Hint / spawn path for MCP — prefer the `aevum-mcp` binary for stdio.
+/// `unify mcp --mission <dir> [--write-config claude|cursor] [--out <path>]`
 pub fn cmd_mcp_hint(args: &[String]) -> Result<(), CliError> {
     let mission = require_value(args, "--mission")?;
     if !Path::new(&mission).join("metadata.json").exists() {
@@ -583,20 +584,55 @@ pub fn cmd_mcp_hint(args: &[String]) -> Result<(), CliError> {
             "{mission} is not a mission directory"
         )));
     }
+    let write_cfg = args
+        .windows(2)
+        .find(|w| w[0] == "--write-config")
+        .map(|w| w[1].clone());
+    let out = args
+        .windows(2)
+        .find(|w| w[0] == "--out")
+        .map(|w| w[1].clone());
+
+    let mcp_bin = std::env::var("AEVUM_MCP_BIN").unwrap_or_else(|_| "aevum-mcp".into());
+    let fragment = serde_json::json!({
+        "mcpServers": {
+            "winaevum-unify": {
+                "command": mcp_bin,
+                "args": ["--mission", mission],
+                "env": {
+                    "SLOPCHECK_BIN": std::env::var("SLOPCHECK_BIN").unwrap_or_default(),
+                    "AEVUM_MISSION": mission
+                }
+            }
+        }
+    });
+
+    if let Some(client) = write_cfg {
+        let path = out.unwrap_or_else(|| match client.as_str() {
+            "cursor" => ".cursor/mcp.json".into(),
+            "claude" => ".mcp.json".into(),
+            other => format!("mcp.{other}.json"),
+        });
+        if let Some(parent) = Path::new(&path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|e| CliError::Io(e.to_string()))?;
+            }
+        }
+        fs::write(
+            &path,
+            serde_json::to_string_pretty(&fragment).unwrap() + "\n",
+        )
+        .map_err(|e| CliError::Io(e.to_string()))?;
+        println!("✓ wrote {client} MCP config → {path}");
+        return Ok(());
+    }
+
     println!("MCP stdio server:");
     println!("  aevum-mcp --mission {mission}");
     println!();
-    println!("Cursor mcp.json fragment:");
-    println!(
-        "{}",
-        serde_json::json!({
-            "mcpServers": {
-                "aevum": {
-                    "command": "aevum-mcp",
-                    "args": ["--mission", mission]
-                }
-            }
-        })
-    );
+    println!("Cursor/Claude mcp fragment:");
+    println!("{}", serde_json::to_string_pretty(&fragment).unwrap());
+    println!();
+    println!("Write with: unify mcp --mission {mission} --write-config claude|cursor");
     Ok(())
 }

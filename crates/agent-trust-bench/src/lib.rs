@@ -65,6 +65,7 @@ pub fn run_all() -> Vec<CaseResult> {
         case_14_sqlite_roundtrip(),
         case_15_golden_pr_draft_no_merge(),
         case_16_slop_inference_cannot_authorize(),
+        case_17_package_binds_ledger_after_effects(),
     ]
 }
 
@@ -452,12 +453,31 @@ fn case_12_mcp_initialize_tools() -> CaseResult {
         .and_then(|t| t.as_array())
         .cloned()
         .unwrap_or_default();
-    if tools.len() < 8 {
+    if tools.len() < 14 {
         return fail(
             "ATB-12",
             "MCP tools surface",
             format!("only {} tools", tools.len()),
         );
+    }
+    let names: Vec<&str> = tools
+        .iter()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+        .collect();
+    for need in [
+        "aevum_package",
+        "aevum_verify_package",
+        "aevum_golden",
+        "aevum_falsify",
+        "aevum_slop_scan",
+    ] {
+        if !names.contains(&need) {
+            return fail(
+                "ATB-12",
+                "MCP tools surface",
+                format!("missing {need} in {names:?}"),
+            );
+        }
     }
     let ctx = aevum_mcp::ToolCtx::new(mission);
     match aevum_mcp::tools::dispatch(&ctx, "aevum_graph_status", &serde_json::json!({})) {
@@ -698,6 +718,64 @@ fn case_16_slop_inference_cannot_authorize() -> CaseResult {
             format!("any_slop={any_slop} allowed={allowed}"),
         )
     }
+}
+
+fn case_17_package_binds_ledger_after_effects() -> CaseResult {
+    let tmp = tempfile::tempdir().unwrap();
+    let mission = new_mission(tmp.path(), "mis_c17");
+    aevum_unify::cmd_run(&[
+        "--mission".into(),
+        mission.to_str().unwrap().into(),
+        "--capability".into(),
+        "git.branch.create".into(),
+        "--argv".into(),
+        "git checkout -b c17".into(),
+    ])
+    .unwrap();
+    let pkg = tmp.path().join("pkg.json");
+    match aevum_unify::cmd_package(&[
+        "--mission".into(),
+        mission.to_str().unwrap().into(),
+        "--out".into(),
+        pkg.to_str().unwrap().into(),
+    ]) {
+        Ok(()) => {}
+        Err(e) => {
+            return fail(
+                "ATB-17",
+                "Package binds non-empty ledger after effects",
+                e.to_string(),
+            )
+        }
+    }
+    let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(&pkg).unwrap()).unwrap();
+    let ledger = v
+        .get("ledger_entries")
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    let audit_d = v
+        .get("audit_trail_digest")
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    if ledger.trim().is_empty() {
+        return fail(
+            "ATB-17",
+            "Package binds non-empty ledger after effects",
+            "ledger_entries empty",
+        );
+    }
+    if !audit_d.starts_with("sha256:") || audit_d == "sha256:none" {
+        return fail(
+            "ATB-17",
+            "Package binds non-empty ledger after effects",
+            format!("bad audit_trail_digest={audit_d}"),
+        );
+    }
+    ok(
+        "ATB-17",
+        "Package binds non-empty ledger after effects",
+        format!("ledger_bytes={} audit={}", ledger.len(), audit_d),
+    )
 }
 
 /// Re-export for integration callers.

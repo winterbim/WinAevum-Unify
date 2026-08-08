@@ -1,0 +1,68 @@
+{
+  "scorecard": "aevum-hub-v0",
+  "passed": 12,
+  "total": 12,
+  "verdict": "AEVUM_HUB_READY",
+  "rows": [
+    {
+      "gate": "build",
+      "pass": true,
+      "detail": "unify + aevum-mcp"
+    },
+    {
+      "gate": "binaries",
+      "pass": true,
+      "detail": "unify+aevum-mcp"
+    },
+    {
+      "gate": "claude_plugin",
+      "pass": true,
+      "detail": "/home/wina/aevum unifiy/aevum-unify/plugins/aevum-unify"
+    },
+    {
+      "gate": "hub_adapters_doc",
+      "pass": true,
+      "detail": "docs/HUB_ADAPTERS.md"
+    },
+    {
+      "gate": "adr_0021",
+      "pass": true,
+      "detail": "Trusted Autonomy Hub"
+    },
+    {
+      "gate": "atb",
+      "pass": true,
+      "detail": "17/17"
+    },
+    {
+      "gate": "mcp_doctrine_tools",
+      "pass": true,
+      "detail": "all present"
+    },
+    {
+      "gate": "pretool_d14",
+      "pass": true,
+      "detail": "Aevum D14: sh -c / bash -c denied \u2014 use process.exec.argv via unify exec"
+    },
+    {
+      "gate": "adapter_claude",
+      "pass": true,
+      "detail": "Claude Code"
+    },
+    {
+      "gate": "adapter_cursor",
+      "pass": true,
+      "detail": "Cursor"
+    },
+    {
+      "gate": "adapter_windsurf",
+      "pass": true,
+      "detail": "Windsurf"
+    },
+    {
+      "gate": "adapter_copilot",
+      "pass": true,
+      "detail": "Copilot"
+    }
+  ]
+}

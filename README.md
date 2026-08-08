@@ -1,138 +1,88 @@
-# WinAevum-Unify — Local-First Trusted Autonomy × Anti-Slop
+# WinAevum-Unify — Trusted Autonomy Hub
 
-**WinAevum-Unify** is the first stack that unifies:
+**The reference control plane under Claude Code, Cursor, Windsurf, and Copilot Agent.**
+
+WinAevum-Unify unifies:
 
 1. **Trusted Autonomy** — authorize · attest · package (temporal evidence graph, epistemic firewall)
-2. **Deterministic AI-slop firewall** — [slopcheck](https://github.com/winterbim/slopcheck) findings bind into the same graph as **Inference only** (never authorize)
+2. **Deterministic AI-slop firewall** — [slopcheck](https://github.com/winterbim/slopcheck) findings bind as **Inference only** (never authorize)
+3. **Universal hub** — MCP + Claude plugin + PreToolUse bridge + IDE adapters (ADR-0021)
 
-No memory vendor. No LLM-as-authority. Offline by default.
+No memory vendor. No LLM-as-authority. No `bypassPermissions`. Offline by default. Golden Path never auto-merges.
 
-**Product category:** Trusted Autonomy + Anti-Slop Evidence  
-**Repo:** https://github.com/winterbim/WinAevum-Unify
+**Repo:** https://github.com/winterbim/WinAevum-Unify  
+**Why this hub:** [docs/HUB_ADAPTERS.md](docs/HUB_ADAPTERS.md)
 
 ## What ships
 
 | Layer | Contents |
 |---|---|
-| Rust trust path | identity, attestation, ledger, sentinel, capabilities, TemporalGraph, memory-fabric (SQLite multi-tenant), `unify` CLI |
-| Anti-slop | `unify slop` → slopcheck → Inference episodes; Golden Path gate by default |
-| Proof benches | AgentTrustBench **16/16**, MemoryTruthBench **9/9** offline |
-| MCP | `aevum-mcp` incl. `aevum_slop_scan` |
-| UI | Mission Control |
+| Rust trust path | identity, attestation, ledger, sentinel, TemporalGraph, memory-fabric, `unify` CLI |
+| Anti-slop + rules | `unify slop`, `unify rules scan` → Inference episodes |
+| Parallel | `unify parallel` — attested best-of-N (no auto-merge) |
+| Proof | AgentTrustBench **17/17**, MemoryTruthBench **9/9**, hub scorecard |
+| MCP | package / verify-package / golden / falsify / slop / rules / pretool_check |
+| Plugin | [`plugins/aevum-unify`](plugins/aevum-unify) for Claude Code |
+| UI | Mission Control — graph, golden path, packages, ledger |
 
 License: **MIT OR Apache-2.0**.
-
-**Product category:** Trusted Autonomy (authorize · attest · package)  
-**Not:** a third-party agent-memory clone. Memory is a native SQLite plane
-behind an epistemic firewall (ADR-0018).
-
-## What ships
-
-| Layer | Contents |
-|---|---|
-| Rust trust path | identity, attestation, ledger, sentinel-kernel, capability-engine, secret-broker, autonomy-governor, evidence-graph (`TemporalGraph`), memory-fabric (SQLite+FTS5), git-provider, `unify` CLI |
-| Proof benches | AgentTrustBench (16/16), MemoryTruthBench (9/9 offline) |
-| MCP | `aevum-mcp` stdio JSON-RPC tools on the real trust path |
-| Contracts | `@aevum/contracts` TypeScript types (constitution, risk, policy, temporal graph) |
-| UI | Mission Control (Vite/React) — missions, graph, golden path, ledger |
-
-License: **MIT OR Apache-2.0** (`LICENSE-MIT`, `LICENSE-APACHE`).
 
 ## Quickstart
 
 ```bash
-cd aevum-unify
-pnpm install --frozen-lockfile
-pnpm -r lint && pnpm -r build && pnpm -r test
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+pnpm install --frozen-lockfile && pnpm -r test
 cargo test --workspace
-cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 16/16
+cargo run -p aevum-agent-trust-bench    # AEVUM_PERFECT 17/17
 cargo run -p aevum-memory-truth-bench   # AEVUM_MEMORY_PERFECT 9/9
-# Dual plane: trust on a repo + slop on WinAevum itself
-unify slop --mission ./mission --repo . --all
-SLOPCHECK_BIN=~/slopcheck/.venv/bin/slopcheck unify slop --mission ./mission --repo ~/slopcheck --all
-bash scripts/aevum-on-aevum.sh          # dogfood PASS
-python3 scripts/ledger_check.py .project/LEDGER.md
+python3 scripts/benchmark-hub-scorecard.py
+bash scripts/aevum-on-aevum.sh
+bash scripts/dual-dogfood.sh
+bash scripts/aevum-agent-loop.sh /path/to/mission .
 ```
 
-Mission Control UI:
-
-```bash
-pnpm --filter mission-control dev
-# http://localhost:3000
-```
+Mission Control: `pnpm --filter mission-control dev` → http://localhost:3000
 
 ## CLI (trust anchor)
 
 ```bash
-cargo build -p aevum-unify
+cargo build -p aevum-unify -p aevum-mcp
 ./target/debug/unify new --constitution constitution.json --out ./mission
-./target/debug/unify graph status --mission ./mission
-./target/debug/unify run --mission ./mission \
-  --capability git.branch.create --argv "git checkout -b aevum/sec"
-./target/debug/unify exec --mission ./mission \
-  --capability process.exec.argv --argv echo --argv hello
-./target/debug/unify verify ./mission
+./target/debug/unify slop --mission ./mission --repo . --all
+./target/debug/unify rules scan --mission ./mission --repo .
+./target/debug/unify parallel --constitution constitution.json --out /tmp/aevum-p --n 3
 ./target/debug/unify package --mission ./mission --out pkg.json
-./target/debug/unify verify-package pkg.json
+./target/debug/unify mcp --mission ./mission --write-config claude
 ```
 
-`run` / `exec` are gated by the temporal graph: a capability without an active
-`authorizes` fact is refused. Default store is SQLite (`graph.sqlite` + FTS5,
-JSON twin kept); `AEVUM_GRAPH_STORE=json` for JSON-only.
+## Hub clients
 
-Deterministic ingest / contradictions:
+| Client | How |
+|---|---|
+| Claude Code | Install `plugins/aevum-unify` + set `AEVUM_MISSION` |
+| Cursor | `unify mcp --write-config cursor` |
+| Windsurf / Copilot Agent | Point MCP at `aevum-mcp --mission …` |
+
+See [docs/HUB_ADAPTERS.md](docs/HUB_ADAPTERS.md).
+
+## Architecture
+
+```
+crates/
+  evidence-graph/     TemporalGraph + epistemic firewall
+  memory-fabric/      SQLite + slop/rules ingest (Inference)
+  unify-cli/          unify binary (trust anchor)
+  aevum-mcp/          MCP stdio choke-point
+  agent-trust-bench/  ATB 17/17
+plugins/aevum-unify/  Claude Code plugin + PreToolUse
+apps/mission-control/ UI
+```
+
+## Verify before publish
 
 ```bash
-./target/debug/unify graph ingest --mission ./mission --at <REFERENCE_TIME> --file facts.json
-./target/debug/unify graph contradictions --mission ./mission --resolve
+bash scripts/prepub-verify.sh   # expects ATB 17/17
 ```
 
-R3+ missions require `unify falsify` before effects. Golden Path never auto-merges:
+## Release
 
-```bash
-./target/debug/unify golden --mission ./mission --repo . --title "sec fix"
-# writes pr-draft.json (auto_merge=false); AEVUM_GH_PR=1 opens via gh (never merges)
-```
-
-MCP:
-
-```bash
-cargo run -p aevum-mcp -- --mission ./mission
-```
-
-Scorecard (Aevum-only metrics):
-
-```bash
-python3 scripts/benchmark-memory-scorecard.py
-```
-
-## Architecture (short)
-
-```
-packages/contracts/       canonical TS types
-crates/identity/          Ed25519 KeyMaterial + SPIFFE-compatible Identity
-crates/attestation/       canonical JSON, sign, verify, freshness
-crates/ledger/            append-only, hash-chained, Ed25519-signed log
-crates/sentinel-kernel/   capability manifest, argv shell-metachar check
-crates/evidence-graph/    TemporalGraph — episodes, bi-temporal facts, as_of,
-                          epistemic firewall, BM25+RRF+local CE hybrid search
-crates/memory-fabric/     SqliteBackend (default) + assemble + promote
-crates/capability-engine/ role-based allow/deny
-crates/secret-broker/     opaque SecretHandle, value-never-stored
-crates/aevum-mcp/         MCP stdio choke-point
-crates/unify-cli/         unify binary (new/run/exec/graph/golden/…)
-apps/mission-control/     React + Vite Mission Control
-```
-
-Doctrine source: `AEVUM_UNIFY_MASTER_BLUEPRINT_V1.0.md` (repo parent / docs).  
-ADRs: `docs/adr/` (through ADR-0018). Proof ledger: `.project/LEDGER.md`.
-
-## Status
-
-M0–M10 trust path + temporal graph + native memory fabric evidenced
-(see `.project/LEDGER.md` L-01…L-37). CI: `.github/workflows/ci.yml`
-(fmt, clippy, cargo test, ATB, MTB, dogfood, pnpm lint/build/test).
-
-Signed-off by Winter Fernandes.
+Tag **v0.2.0-phare** when Phase 0–1 gates are green on `main`.

@@ -13,11 +13,12 @@ const STEPS_TEMPLATE: Omit<GoldenStep, "status">[] = [
   { id: "1", label: "Constitution drafted", detail: "scope + risk + evidence requirements" },
   { id: "2", label: "Council assembled",  detail: "5–7 agents with diversity gate" },
   { id: "3", label: "Evidence attached",   detail: "tests, lint, dependency audit, repo state" },
-  { id: "4", label: "Branch created",      detail: "aevum/<slug> (no shell, argv typed)" },
-  { id: "5", label: "Patch tested",        detail: "all tests green, lint clean" },
-  { id: "6", label: "Review",              detail: "Falsifier + Verifier + Guardian" },
-  { id: "7", label: "Approval",            detail: "Risk-weighted: R3+ requires human approval" },
-  { id: "8", label: "PR opened (no merge)", detail: "Edge submits PR; never auto-merged" },
+  { id: "4", label: "Slop gate (Inference)", detail: "unify slop — blockers fail; never authorizes" },
+  { id: "5", label: "Branch created",      detail: "aevum/<slug> (no shell, argv typed)" },
+  { id: "6", label: "Patch tested",        detail: "all tests green, lint clean" },
+  { id: "7", label: "Review",              detail: "Falsifier + Verifier + Guardian" },
+  { id: "8", label: "Approval",            detail: "Risk-weighted: R3+ requires human approval" },
+  { id: "9", label: "PR opened (no merge)", detail: "Edge submits PR; never auto-merged" },
 ];
 
 export function GoldenPathView() {
@@ -33,11 +34,12 @@ export function GoldenPathView() {
       if (idx === 0) status = "done";
       if (idx === 1) status = m.council.length > 0 ? "done" : "active";
       if (idx === 2) status = m.evidence.length >= 3 ? "done" : m.council.length > 0 ? "active" : "queued";
-      if (idx === 3) status = completedActionIds.has("git.branch.create") ? "done" : m.evidence.length >= 3 ? "active" : "queued";
-      if (idx === 4) status = m.actions.some((a) => a.capability === "git.commit" && a.status === "executed") ? "done" : completedActionIds.has("git.branch.create") ? "active" : "queued";
-      if (idx === 5) status = m.actions.length > 3 ? "done" : m.status === "approved" || m.status === "executing" ? "active" : "queued";
-      if (idx === 6) status = m.approvals.every((a) => a.decision === "approved") && m.approvals.length > 0 ? "done" : m.risk === "R3" || m.risk === "R2" ? "active" : "queued";
-      if (idx === 7) status = m.status === "completed" ? "done" : m.approvals.every((a) => a.decision === "approved") ? "active" : "queued";
+      if (idx === 3) status = m.evidence.length >= 3 ? "done" : "queued"; // slop Inference step
+      if (idx === 4) status = completedActionIds.has("git.branch.create") ? "done" : m.evidence.length >= 3 ? "active" : "queued";
+      if (idx === 5) status = m.actions.some((a) => a.capability === "git.commit" && a.status === "executed") ? "done" : completedActionIds.has("git.branch.create") ? "active" : "queued";
+      if (idx === 6) status = m.actions.length > 3 ? "done" : m.status === "approved" || m.status === "executing" ? "active" : "queued";
+      if (idx === 7) status = m.approvals.every((a) => a.decision === "approved") && m.approvals.length > 0 ? "done" : m.risk === "R3" || m.risk === "R2" ? "active" : "queued";
+      if (idx === 8) status = m.status === "completed" ? "done" : m.approvals.every((a) => a.decision === "approved") ? "active" : "queued";
     }
     if (deniedActionIds.has("git.branch.create")) status = "blocked";
     return { ...s, status };
@@ -49,7 +51,7 @@ export function GoldenPathView() {
     <>
       <PageHeader
         title="Golden Path"
-        sub="Eight steps from constitution to PR. Never auto-merged."
+        sub="Nine steps from constitution to PR. Slop gate is Inference-only. Never auto-merged."
         actions={
           <select value={missionId} onChange={(e) => setMissionId(e.target.value)} className="btn">
             {missions.map((mm) => <option key={mm.id} value={mm.id}>{mm.id} — {mm.title}</option>)}
@@ -75,7 +77,7 @@ export function GoldenPathView() {
           ))}
         </div>
         <div className="card-b" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="btn primary" disabled={steps[7].status !== "active"}>{steps[7].status === "done" ? "PR draft ready" : "Prepare PR draft (no merge)"}</button>
+          <button className="btn primary" disabled={steps[8].status !== "active"}>{steps[8].status === "done" ? "PR draft ready" : "Prepare PR draft (no merge)"}</button>
           {m && pr ? <a className="btn ghost" href={pr} target="_blank" rel="noreferrer">Open compare URL</a> : null}
           <span style={{ color: "var(--text-faint)", fontSize: 11, marginLeft: 6 }}>
             CLI: <code>unify golden --mission … --repo …</code> writes <code>pr-draft.json</code>; never auto-merges. R3+ needs <code>unify falsify</code> + <code>unify approve</code>.
@@ -86,6 +88,8 @@ export function GoldenPathView() {
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-h"><h2>Policy invariants enforced on this path</h2></div>
         <div className="card-b" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+          <Invariant k="ADR20" v="Slop findings are Inference — never authorize." ok />
+          <Invariant k="ADR21" v="Hub forbids bypassPermissions on agentic path." ok />
           <Invariant k="D04" v="Writes against `main` are denied." ok />
           <Invariant k="D14" v="`sh -c` execution paths are denied." ok />
           <Invariant k="D16" v="argv with shell metacharacters `;&|>$` is rejected." ok />

@@ -1,0 +1,8 @@
+{
+  "name": "aevum-unify",
+  "version": "0.2.0",
+  "description": "WinAevum-Unify Trusted Autonomy Hub — authorize · attest · package · anti-slop under Claude Code",
+  "author": {
+    "name": "Winter Fernandes"
+  }
+}

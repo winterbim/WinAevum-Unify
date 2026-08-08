@@ -7,6 +7,8 @@
 
 pub mod golden;
 pub mod graph_cmd;
+pub mod parallel;
+pub mod rules;
 pub mod slop;
 
 use std::fs;
@@ -80,7 +82,12 @@ pub fn print_help() {
     println!("  unify golden       --mission <dir> --repo <path> [--title …] [--run-tests] [--slop-gate]");
     println!("  unify slop         --mission <dir> [--repo <path>] [--all|--base <ref>]");
     println!("                     # AI-slop firewall → Inference on graph (never authorizes)");
-    println!("  unify mcp          --mission <dir>   # stdio MCP server (trust path)");
+    println!("  unify rules scan   --mission <dir> [--repo <path>]");
+    println!("                     # hookify rules → Inference (never authorizes)");
+    println!("  unify parallel     --constitution <c.json> --out <dir> [--n 2..8]");
+    println!("                     # attested best-of-N missions + compare.json");
+    println!("  unify mcp          --mission <dir> [--write-config claude|cursor] [--out <path>]");
+    println!("                     # stdio MCP / write client config");
     println!("                     (temporal trust graph — gates run/exec)");
 }
 
@@ -253,10 +260,18 @@ fn append_audit_trail(
         "attestation_id": attestation_id,
         "prev_digest": prev_digest,
     });
+    let line = serde_json::to_string(&record).unwrap();
     let mut text = fs::read_to_string(&trail).unwrap_or_default();
-    text.push_str(&serde_json::to_string(&record).unwrap());
+    text.push_str(&line);
     text.push('\n');
-    fs::write(&trail, text).map_err(|e| CliError::Io(format!("writing audit trail: {e}")))?;
+    fs::write(&trail, &text).map_err(|e| CliError::Io(format!("writing audit trail: {e}")))?;
+    // Keep trust ledger twin in sync — evidence packages must not ship empty ledgers
+    // after real effects (ADR-0021 / Projet Phare).
+    let ledger = Path::new(mission_dir).join("ledger.jsonl");
+    let mut ledger_text = fs::read_to_string(&ledger).unwrap_or_default();
+    ledger_text.push_str(&line);
+    ledger_text.push('\n');
+    fs::write(&ledger, ledger_text).map_err(|e| CliError::Io(format!("writing ledger: {e}")))?;
     Ok(())
 }
 
@@ -358,11 +373,44 @@ pub fn cmd_package(args: &[String]) -> Result<(), CliError> {
     let out = require_value(args, "--out")?;
     let meta = load_metadata(&mission)?;
     let ledger_path = Path::new(&mission).join("ledger.jsonl");
-    let ledger_entries = if ledger_path.exists() {
+    let audit_path = Path::new(&mission).join("audit_trail.jsonl");
+    let slop_path = Path::new(&mission).join("slop-report.json");
+
+    let audit_raw = if audit_path.exists() {
+        fs::read_to_string(&audit_path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut ledger_entries = if ledger_path.exists() {
         fs::read_to_string(&ledger_path).unwrap_or_default()
     } else {
         String::new()
     };
+
+    // Fail-closed heal: effects recorded in audit must appear in the trust ledger.
+    if ledger_entries.trim().is_empty() && !audit_raw.trim().is_empty() {
+        fs::write(&ledger_path, &audit_raw)
+            .map_err(|e| CliError::Io(format!("sync ledger from audit: {e}")))?;
+        ledger_entries = audit_raw.clone();
+    }
+    if !audit_raw.trim().is_empty() && ledger_entries.trim().is_empty() {
+        return Err(CliError::Verify(
+            "refuse to package: audit_trail has effects but ledger is empty after sync".into(),
+        ));
+    }
+
+    let audit_digest = if audit_raw.trim().is_empty() {
+        "sha256:none".into()
+    } else {
+        sha256_hex(&audit_raw)
+    };
+    let slop_digest = if slop_path.exists() {
+        let s = fs::read_to_string(&slop_path).unwrap_or_default();
+        sha256_hex(&s)
+    } else {
+        "sha256:none".into()
+    };
+
     // Build the package as a serde_json::Map with explicit insertion order —
     // the verify-package subcommand re-derives the digest by removing the
     // `package_digest` line, so the textual pre-digest representation must
@@ -391,6 +439,14 @@ pub fn cmd_package(args: &[String]) -> Result<(), CliError> {
     pkg.insert(
         "ledger_entries".into(),
         serde_json::Value::String(ledger_entries.clone()),
+    );
+    pkg.insert(
+        "audit_trail_digest".into(),
+        serde_json::Value::String(audit_digest),
+    );
+    pkg.insert(
+        "slop_report_digest".into(),
+        serde_json::Value::String(slop_digest),
     );
     let graph_digest = if graph_cmd::graph_path(&mission).exists() {
         let graw = fs::read_to_string(graph_cmd::graph_path(&mission)).unwrap_or_default();

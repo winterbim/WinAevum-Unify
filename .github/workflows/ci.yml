@@ -26,6 +26,8 @@ jobs:
         run: cargo run -p aevum-agent-trust-bench --quiet
       - name: MemoryTruthBench
         run: cargo run -p aevum-memory-truth-bench --quiet
+      - name: Hub scorecard
+        run: python3 scripts/benchmark-hub-scorecard.py
 
   dogfood:
     runs-on: ubuntu-latest

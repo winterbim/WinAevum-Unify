@@ -28,6 +28,21 @@ fn main() -> ExitCode {
         "approve" => aevum_unify::graph_cmd::cmd_approve(&argv[2..]),
         "golden" => aevum_unify::golden::cmd_golden(&argv[2..]),
         "slop" => aevum_unify::slop::cmd_slop(&argv[2..]),
+        "rules" => {
+            let rest = &argv[2..];
+            if rest.first().map(|s| s.as_str()) == Some("scan") {
+                aevum_unify::rules::cmd_rules_scan(&rest[1..])
+            } else {
+                aevum_unify::rules::cmd_rules_scan(rest)
+            }
+        }
+        "parallel" => {
+            if argv.get(2).map(|s| s.as_str()) == Some("worktrees") {
+                aevum_unify::parallel::cmd_parallel_worktrees(&argv[3..])
+            } else {
+                aevum_unify::parallel::cmd_parallel(&argv[2..])
+            }
+        }
         "--help" | "-h" | "help" => {
             aevum_unify::print_help();
             return ExitCode::SUCCESS;
