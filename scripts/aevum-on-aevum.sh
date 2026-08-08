@@ -130,7 +130,7 @@ root = Path("${ROOT}")
 cargo = (root / "Cargo.toml").read_text()
 adr = (root / "docs/adr/ADR-0013-temporal-evidence-graph.md").read_text()
 lib = (root / "crates/evidence-graph/src/lib.rs").read_text()
-assert 'rust-version = "1.82"' in cargo or 'rust-version="1.82"' in cargo.replace(" ", "")
+assert re.search(r'rust-version\s*=\s*"1\.85"', cargo), "MSRV must be 1.85"
 assert "TemporalGraph" in lib
 assert "adopted" in adr.lower()
 assert "Temporal" in adr or "temporal" in adr or "Native" in adr
