@@ -1,7 +1,7 @@
 {
   "scorecard": "aevum-hub-v0",
-  "passed": 12,
-  "total": 12,
+  "passed": 16,
+  "total": 16,
   "verdict": "AEVUM_HUB_READY",
   "rows": [
     {
@@ -38,6 +38,26 @@
       "gate": "mcp_doctrine_tools",
       "pass": true,
       "detail": "all present"
+    },
+    {
+      "gate": "agent_doctor",
+      "pass": true,
+      "detail": "cli help"
+    },
+    {
+      "gate": "agent_dream",
+      "pass": true,
+      "detail": "cli help"
+    },
+    {
+      "gate": "agent_dream_doc",
+      "pass": true,
+      "detail": "docs/AGENT_DREAM.md"
+    },
+    {
+      "gate": "agent_loop_dream",
+      "pass": true,
+      "detail": "doctor + dream + AGENT_CARD in agent loop"
     },
     {
       "gate": "pretool_d14",
