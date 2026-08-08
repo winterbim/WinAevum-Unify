@@ -36,7 +36,7 @@ PY
 ADR013="docs/adr/ADR-0013-temporal-evidence-graph.md"
 test -f "$ADR013"
 TEST_CRATES="$(ls crates | wc -l | tr -d ' ')"
-HAS_TEMPORAL="$(rg -l 'TemporalGraph' crates/evidence-graph/src/lib.rs || true)"
+HAS_TEMPORAL="$(grep -l 'TemporalGraph' crates/evidence-graph/src/lib.rs || true)"
 test -n "$HAS_TEMPORAL"
 
 echo "    rust-version=$RUST_VER crates=$TEST_CRATES adr013=present"
